@@ -1,20 +1,20 @@
+use crate::util::Formatter;
+use log::{debug, info, log_enabled, trace, warn, Level};
+use ssh2::Session;
 use std::{
     io::{Read, Write},
     path::PathBuf,
     time::{Duration, Instant},
 };
 
-use log::{debug, info, log_enabled, trace, warn, Level};
-use ssh2::Session;
-
 pub struct EchoTestResult {
     pub char_count: usize,
     pub char_sent: usize,
-    pub avg_latency: f64,
-    pub std_latency: f64,
-    pub med_latency: f64,
-    pub min_latency: f64,
-    pub max_latency: f64,
+    pub avg_latency: Duration,
+    pub std_latency: Duration,
+    pub med_latency: Duration,
+    pub min_latency: Duration,
+    pub max_latency: Duration,
 }
 
 pub fn run_echo_test(
@@ -22,6 +22,7 @@ pub fn run_echo_test(
     echo_cmd: &str,
     char_count: usize,
     time_limit: Option<f64>,
+    formatter: &Formatter,
 ) -> Result<EchoTestResult, String> {
     debug!("Running echo test with command: {echo_cmd:?}");
     debug!("Number of characters to echo: {char_count:?}");
@@ -74,16 +75,18 @@ pub fn run_echo_test(
         }
         if last_log_time.elapsed() > log_interval || log_enabled!(Level::Info) {
             last_log_time = Instant::now();
-            let avg_latency = total_latency as f64 / (n + 1) as f64;
-            let min_latency = latencies.iter().min().unwrap();
-            let max_latency = latencies.iter().max().unwrap();
-            print!(
-                "Ping {n}/{char_count}, Latency: {avg_latency:.2} us (min: {min_latency:.2} us, max: {max_latency:.2} us)\r",
+            let avg_latency = Duration::from_nanos((total_latency as u64) / ((n + 1) as u64));
+            let min_latency =
+                Duration::from_nanos(latencies.iter().min().unwrap().to_owned() as u64);
+            let max_latency =
+                Duration::from_nanos(latencies.iter().max().unwrap().to_owned() as u64);
+            let log = format!(
+                "Ping {n}/{char_count}, Average Latency: {}",
+                formatter.format_duration(avg_latency)
             );
+            print!("{log:<80}\r");
         }
     }
-    channel.close().map_err(|e| e.to_string())?;
-    channel.wait_close().map_err(|e| e.to_string())?;
 
     let char_sent = latencies.len();
     if char_sent == 0 {
@@ -95,20 +98,62 @@ pub fn run_echo_test(
 
     // Calculate latency statistics
     latencies.sort();
-    let avg_latency = total_latency as f64 / char_sent as f64;
-    let std_latency = latencies
-        .iter()
-        .map(|&latency| (latency as f64 - avg_latency).powi(2))
-        .sum::<f64>()
-        .sqrt();
-    let med_latency = match latencies.len() % 2 {
-        0 => (latencies[latencies.len() / 2 - 1] + latencies[latencies.len() / 2]) as f64 / 2.0,
-        _ => latencies[latencies.len() / 2] as f64,
-    };
-    let min_latency = latencies.iter().min().unwrap().to_owned() as f64;
-    let max_latency = latencies.iter().max().unwrap().to_owned() as f64;
+    let avg_latency = latencies.iter().sum::<u128>() / (char_sent as u128);
+    let std_latency = Duration::from_nanos(
+        ((latencies
+            .iter()
+            .map(|&latency| ((latency as i128) - (avg_latency as i128)).pow(2))
+            .sum::<i128>() as f64)
+            / (char_sent as f64))
+            .sqrt() as u64,
+    );
+    let avg_latency = Duration::from_nanos(avg_latency as u64);
+    let med_latency = Duration::from_nanos(
+        (match char_sent % 2 {
+            0 => (latencies[char_sent / 2 - 1] + latencies[char_sent / 2]) / 2,
+            _ => latencies[char_sent / 2],
+        }) as u64,
+    );
+    let min_latency = Duration::from_nanos(latencies.first().unwrap().to_owned() as u64);
+    let max_latency = Duration::from_nanos(latencies.last().unwrap().to_owned() as u64);
 
-    info!("Sent {char_sent}/{char_count}, Latency: {avg_latency:.2} us (min: {min_latency:.2} us, max: {max_latency:.2} us)\r");
+    if log_enabled!(Level::Info) {
+        let p1_latency = Duration::from_nanos(
+            latencies
+                .iter()
+                .rev()
+                .nth(char_sent / 100)
+                .unwrap()
+                .to_owned() as u64,
+        );
+        let p5_latency = Duration::from_nanos(
+            latencies
+                .iter()
+                .rev()
+                .nth(char_sent / 20)
+                .unwrap()
+                .to_owned() as u64,
+        );
+        let p10_latency = Duration::from_nanos(
+            latencies
+                .iter()
+                .rev()
+                .nth(char_sent / 10)
+                .unwrap()
+                .to_owned() as u64,
+        );
+        info!(
+            "Sent {char_sent}/{char_count}, Latency:\n\tMean:\t{}\n\tStd:\t{}\n\tMin:\t{}\n\tMedian:\t{}\n\tMax:\t{}\n\t1% High:\t{}\n\t5% High:\t{}\n\t10% High:\t{}",
+            formatter.format_duration(avg_latency),
+            formatter.format_duration(std_latency),
+            formatter.format_duration(min_latency),
+            formatter.format_duration(med_latency),
+            formatter.format_duration(max_latency),
+            formatter.format_duration(p1_latency),
+            formatter.format_duration(p5_latency),
+            formatter.format_duration(p10_latency)
+        );
+    }
     Ok(EchoTestResult {
         char_count,
         char_sent,
@@ -120,8 +165,16 @@ pub fn run_echo_test(
     })
 }
 
-pub fn run_speed_test(session: &Session, size: f64, remote_file: &PathBuf) -> Result<(), String> {
-    debug!("Running speed test with file size: {size} MB");
+pub fn run_speed_test(
+    session: &Session,
+    size: u64,
+    remote_file: &PathBuf,
+    formatter: &Formatter,
+) -> Result<(), String> {
+    debug!(
+        "Running speed test with file size: {}",
+        formatter.format_size(size)
+    );
     debug!("Remote file path: {remote_file:?}");
     // TODO: Implement speed test
     Ok(())
