@@ -60,16 +60,20 @@ pub struct Options {
     #[arg(short = 't', long, value_name = "SECONDS")]
     pub echo_timeout: Option<f64>,
 
-    /// File SIZE for speed test in megabytes
-    #[arg(short, long, default_value = "8.0 MB", value_parser = parse_file_size)]
+    /// File SIZE for speed test
+    #[arg(short, long, default_value = "8.0MB", value_parser = parse_file_size)]
     pub size: u64,
+
+    /// Chunk SIZE for splitting file in speed test
+    #[arg(short = 'u', long, default_value = "1.0MB", value_parser = parse_file_size)]
+    pub chunk_size: u64,
 
     /// Remote FILE path for speed tests
     #[arg(
         short = 'z',
         long,
         value_name = "FILE",
-        default_value = "/tmp/sshping-PID.tmp"
+        default_value = "/tmp/sshping-test.tmp"
     )]
     pub remote_file: PathBuf,
 
@@ -81,7 +85,7 @@ pub struct Options {
     #[arg(short = 'H', long)]
     pub human_readable: bool,
 
-    /// Specify delimiters to use in big numbers, e.g., 1,234,567
+    /// Specify delimiters to use (or None for not) in big numbers
     #[arg(short, long, default_value = ",")]
     pub delimit: Option<char>,
 
