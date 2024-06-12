@@ -11,6 +11,7 @@ clap = { version = "4.5.7", features = ["derive", "string", "cargo"] }
 humantime = "2.1.0"
 log = "0.4.21"
 num-format = "0.4.4"
+rand = "0.8.5"
 shellexpand = "3.1.0"
 simple_logger = "5.0.0"
 size = "0.4.1"
