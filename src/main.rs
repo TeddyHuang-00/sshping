@@ -36,6 +36,7 @@ fn main() -> ExitCode {
                 4.. => LevelFilter::Trace,
             },
         )
+        .without_timestamps()
         .init()
         .unwrap();
 
