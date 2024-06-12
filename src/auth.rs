@@ -9,7 +9,7 @@ pub fn authenticate_all(
     user: &str,
     password: Option<&str>,
     identity: Option<&PathBuf>,
-) -> Result<Duration, String> {
+) -> Result<Duration, &'static str> {
     let methods = session
         .auth_methods(user)
         .unwrap()
@@ -20,7 +20,7 @@ pub fn authenticate_all(
     let now = Instant::now();
     match session.userauth_agent(user) {
         Ok(_) => {
-            info!("Agent authentication succeeded");
+            debug!("Agent authentication succeeded");
             return Ok(now.elapsed());
         }
         Err(e) => warn!("Agent authentication failed: {e}"),
@@ -52,5 +52,5 @@ pub fn authenticate_all(
         }
     }
     // Fails if all authentication methods fail
-    Err("All authentication methods failed".to_string())
+    Err("All authentication methods failed")
 }
