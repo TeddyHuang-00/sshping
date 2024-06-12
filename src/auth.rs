@@ -1,4 +1,4 @@
-use log::{info, warn};
+use log::{debug, info, warn};
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
@@ -15,7 +15,7 @@ pub fn authenticate_all(
         .unwrap()
         .split(",")
         .collect::<Vec<&str>>();
-    info!("Available authentication methods: {methods:?}");
+    debug!("Available authentication methods: {methods:?}");
     // Try all authentication methods in order of preference
     let now = Instant::now();
     match session.userauth_agent(user) {
