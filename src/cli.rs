@@ -1,13 +1,16 @@
 // Import necessary crates
+extern crate bytesize;
 extern crate clap;
 extern crate shellexpand;
 extern crate users;
-use std::path::PathBuf;
-use users::get_current_username;
 
+use bytesize::ByteSize;
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, ArgAction, Parser, ValueEnum,
 };
+use shellexpand::tilde;
+use std::path::PathBuf;
+use users::get_current_username;
 
 // Define options struct
 #[derive(Parser, Debug)]
@@ -64,8 +67,8 @@ pub struct Options {
     pub echo_timeout: Option<f64>,
 
     /// File SIZE for speed test in megabytes
-    #[arg(short, long, default_value_t = 8.0)]
-    pub size: f64,
+    #[arg(short, long, default_value = "8.0 MB", value_parser = parse_file_size)]
+    pub size: u64,
 
     /// Remote FILE path for speed tests
     #[arg(
@@ -148,7 +151,12 @@ fn parse_target(s: &str) -> Result<Target, String> {
 }
 
 fn parse_local_path(s: &str) -> Result<PathBuf, String> {
-    Ok(PathBuf::from(shellexpand::tilde(s).to_string())
+    Ok(PathBuf::from(tilde(s).to_string())
         .canonicalize()
         .expect("Failed to parse path"))
+}
+
+fn parse_file_size(s: &str) -> Result<u64, String> {
+    let size = s.parse::<ByteSize>().unwrap().0;
+    Ok(size)
 }
