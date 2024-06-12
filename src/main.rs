@@ -41,7 +41,7 @@ fn main() -> ExitCode {
         .unwrap();
 
     // Get the formatter for output
-    let formatter = Formatter::new(opts.human_readable, opts.delimit);
+    let formatter = Formatter::new(opts.human_readable, opts.delimiter);
 
     // Respect the SSH configuration file if it exists
     if opts.config.exists() {

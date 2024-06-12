@@ -1,5 +1,6 @@
 use bytesize::ByteSize;
 use clap::{
+    builder::{styling::AnsiColor, Styles},
     crate_authors, crate_description, crate_name, crate_version, ArgAction, Parser, ValueEnum,
 };
 use shellexpand::tilde;
@@ -13,6 +14,7 @@ use users::get_current_username;
 #[command(about = crate_description!())]
 #[command(long_about = crate_description!())]
 #[command(author = crate_authors!())]
+#[command(styles = get_styles())]
 pub struct Options {
     /// [user@]host[:port]
     #[arg(value_parser = parse_target)]
@@ -77,6 +79,10 @@ pub struct Options {
     )]
     pub remote_file: PathBuf,
 
+    /// Specify delimiters to use (or None for not using) in big numbers
+    #[arg(short, long, default_value = ",")]
+    pub delimiter: Option<char>,
+
     /// Append measurement in ping-like rtt format
     #[arg(short = 'P', long)]
     pub ping_summary: bool,
@@ -84,10 +90,6 @@ pub struct Options {
     /// Use human-friendly units
     #[arg(short = 'H', long)]
     pub human_readable: bool,
-
-    /// Specify delimiters to use (or None for not) in big numbers
-    #[arg(short, long, default_value = ",")]
-    pub delimit: Option<char>,
 
     /// Wait for keyboard input before exiting
     #[arg(short, long)]
@@ -157,4 +159,15 @@ fn parse_local_path(s: &str) -> Result<PathBuf, String> {
 fn parse_file_size(s: &str) -> Result<u64, String> {
     let size = s.parse::<ByteSize>().unwrap().0;
     Ok(size)
+}
+
+pub fn get_styles() -> Styles {
+    Styles::styled()
+        .header(AnsiColor::Green.on_default().bold())
+        .usage(AnsiColor::Green.on_default().bold())
+        .literal(AnsiColor::Cyan.on_default().bold())
+        .placeholder(AnsiColor::Blue.on_default())
+        .error(AnsiColor::Red.on_default().bold())
+        .valid(AnsiColor::Green.on_default().bold())
+        .invalid(AnsiColor::Yellow.on_default().bold())
 }
