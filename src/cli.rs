@@ -1,9 +1,3 @@
-// Import necessary crates
-extern crate bytesize;
-extern crate clap;
-extern crate shellexpand;
-extern crate users;
-
 use bytesize::ByteSize;
 use clap::{
     crate_authors, crate_description, crate_name, crate_version, ArgAction, Parser, ValueEnum,

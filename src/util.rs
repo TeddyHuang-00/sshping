@@ -1,7 +1,3 @@
-extern crate humantime;
-extern crate num_format;
-extern crate size;
-
 use num_format::{Buffer, CustomFormat};
 use size::{Base, Size, Style};
 use std::time::Duration;
