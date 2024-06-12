@@ -114,12 +114,16 @@ fn main() -> ExitCode {
     assert!(session.authenticated());
 
     // Running tests
-    if opts.run_tests == Test::Echo || opts.run_tests == Test::Both {
-        run_echo_test(&session, &opts.echo_cmd, opts.char_count, opts.echo_timeout).unwrap();
-    }
-    if opts.run_tests == Test::Speed || opts.run_tests == Test::Both {
-        run_speed_test(&session, opts.size, &opts.remote_file).unwrap();
-    }
+    let echo_test_result = if opts.run_tests == Test::Echo || opts.run_tests == Test::Both {
+        Some(run_echo_test(&session, &opts.echo_cmd, opts.char_count, opts.echo_timeout).unwrap())
+    } else {
+        None
+    };
+    let speed_test_result = if opts.run_tests == Test::Speed || opts.run_tests == Test::Both {
+        Some(run_speed_test(&session, opts.size, &opts.remote_file).unwrap())
+    } else {
+        None
+    };
 
     // Waiting for key input before exiting
     if opts.key_wait {
@@ -127,6 +131,7 @@ fn main() -> ExitCode {
         let mut buf = [0u8; 1];
         let _ = std::io::stdin().read(&mut buf).unwrap();
     }
+
     // Exit successfully
     ExitCode::from(0)
 }
