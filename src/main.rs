@@ -133,7 +133,16 @@ fn main() -> ExitCode {
         None
     };
     let speed_test_result = if opts.run_tests == Test::Speed || opts.run_tests == Test::Both {
-        Some(run_speed_test(&session, opts.size, &opts.remote_file, &formatter).unwrap())
+        Some(
+            run_speed_test(
+                &session,
+                opts.size,
+                opts.chunk_size,
+                &opts.remote_file,
+                &formatter,
+            )
+            .unwrap(),
+        )
     } else {
         None
     };
