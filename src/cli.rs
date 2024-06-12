@@ -84,9 +84,9 @@ pub struct Options {
     #[arg(short = 'H', long)]
     pub human_readable: bool,
 
-    /// Use delimiters in big numbers, e.g., 1,234,567
-    #[arg(short, long)]
-    pub delimit: bool,
+    /// Specify delimiters to use in big numbers, e.g., 1,234,567
+    #[arg(short, long, default_value = ",")]
+    pub delimit: Option<char>,
 
     /// Wait for keyboard input before exiting
     #[arg(short, long)]
