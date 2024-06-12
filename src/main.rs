@@ -7,7 +7,7 @@ use cli::{Options, Test};
 use tests::{run_echo_test, run_speed_test};
 
 use clap::Parser;
-use log::{error, info, LevelFilter};
+use log::{debug, error, info, LevelFilter};
 use simple_logger::SimpleLogger;
 use ssh2::Session;
 use ssh2_config::{ParseRule, SshConfig};
@@ -66,6 +66,7 @@ fn main() -> ExitCode {
         }
     }
 
+    debug!("Options: {:?}", opts);
     info!("User: {}", opts.target.user);
     info!("Host: {}", opts.target.host);
     info!("Port: {}", opts.target.port);
@@ -97,28 +98,27 @@ fn main() -> ExitCode {
     }
 
     // Try to authenticate with the 1) first identity in the agent; 2) specified identity; 3) password
-    match authenticate_all(
+    let ssh_connect_time = match authenticate_all(
         &session,
         &opts.target.user,
         opts.password.as_deref(),
         opts.identity.as_ref(),
     ) {
-        Ok(_) => {}
+        Ok(time) => time,
         Err(e) => {
-            error!("{e}");
-            error!("Existing due to authentication failure");
+            error!("Exiting due to authenticate: {e}");
             return ExitCode::from(1);
         }
-    }
+    };
     // Make sure we succeeded
     assert!(session.authenticated());
 
     // Running tests
     if opts.run_tests == Test::Echo || opts.run_tests == Test::Both {
-        run_echo_test(&session, &opts.echo_cmd, opts.char_count, opts.echo_timeout);
+        run_echo_test(&session, &opts.echo_cmd, opts.char_count, opts.echo_timeout).unwrap();
     }
     if opts.run_tests == Test::Speed || opts.run_tests == Test::Both {
-        run_speed_test(&session, opts.size, &opts.remote_file);
+        run_speed_test(&session, opts.size, &opts.remote_file).unwrap();
     }
 
     // Waiting for key input before exiting
