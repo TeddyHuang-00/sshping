@@ -1,13 +1,12 @@
 mod auth;
 mod cli;
 mod tests;
+mod util;
 
 use auth::authenticate_all;
-use cli::{Options, Test};
-use tests::{run_echo_test, run_speed_test};
-
 use clap::Parser;
-use log::{debug, error, info, LevelFilter};
+use cli::{Options, Test};
+use log::{debug, error, info, trace, LevelFilter};
 use simple_logger::SimpleLogger;
 use ssh2::Session;
 use ssh2_config::{ParseRule, SshConfig};
@@ -15,6 +14,8 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::net::TcpStream;
 use std::process::ExitCode;
+use tests::{run_echo_test, run_speed_test};
+use util::Formatter;
 
 // use std::path::Path;
 // use std::time::Duration;
@@ -38,9 +39,12 @@ fn main() -> ExitCode {
         .init()
         .unwrap();
 
+    // Get the formatter for output
+    let formatter = Formatter::new(opts.human_readable, opts.delimit);
+
     // Respect the SSH configuration file if it exists
     if opts.config.exists() {
-        info!("SSH Config: {:?}", opts.config);
+        debug!("SSH Config: {:?}", opts.config);
         let mut reader =
             BufReader::new(File::open(&opts.config).expect("Could not open configuration file"));
         let config = SshConfig::default()
@@ -66,11 +70,10 @@ fn main() -> ExitCode {
         }
     }
 
-    debug!("Options: {:?}", opts);
-    info!("User: {}", opts.target.user);
-    info!("Host: {}", opts.target.host);
-    info!("Port: {}", opts.target.port);
-    info!("Echo Command: {}", opts.echo_cmd);
+    trace!("Options: {:?}", opts);
+    debug!("User: {}", opts.target.user);
+    debug!("Host: {}", opts.target.host);
+    debug!("Port: {}", opts.target.port);
 
     // Connect to the local SSH server
     let tcp = match TcpStream::connect(format!("{}:{}", opts.target.host, opts.target.port)) {
@@ -115,12 +118,21 @@ fn main() -> ExitCode {
 
     // Running tests
     let echo_test_result = if opts.run_tests == Test::Echo || opts.run_tests == Test::Both {
-        Some(run_echo_test(&session, &opts.echo_cmd, opts.char_count, opts.echo_timeout).unwrap())
+        Some(
+            run_echo_test(
+                &session,
+                &opts.echo_cmd,
+                opts.char_count,
+                opts.echo_timeout,
+                &formatter,
+            )
+            .unwrap(),
+        )
     } else {
         None
     };
     let speed_test_result = if opts.run_tests == Test::Speed || opts.run_tests == Test::Both {
-        Some(run_speed_test(&session, opts.size, &opts.remote_file).unwrap())
+        Some(run_speed_test(&session, opts.size, &opts.remote_file, &formatter).unwrap())
     } else {
         None
     };
