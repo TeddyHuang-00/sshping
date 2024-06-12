@@ -1,8 +1,7 @@
 use log::{debug, info, warn};
+use ssh2::Session;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-
-use ssh2::Session;
 
 pub fn authenticate_all(
     session: &Session,
