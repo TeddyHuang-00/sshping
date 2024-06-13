@@ -156,13 +156,13 @@ fn main() -> ExitCode {
     let mut modifications = vec![];
     let mut row_count = 1;
     if let Some(result) = echo_test_result {
-        let records = result.to_formatted_frame(&formatter);
+        let records = result.to_formatted_frame();
         modifications.push(((row_count + 1, 0), Span::row(records.len())));
         row_count += records.len();
         data.extend(records);
     }
     if let Some(result) = speed_test_result {
-        let records = result.to_formatted_frame(&formatter);
+        let records = result.to_formatted_frame();
         modifications.push(((row_count + 1, 0), Span::row(records.len())));
         data.extend(records);
     }

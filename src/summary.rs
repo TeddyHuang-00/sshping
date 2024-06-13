@@ -5,34 +5,38 @@ use tabled::Tabled;
 pub struct EchoTestSummary {
     pub char_count: usize,
     pub char_sent: usize,
-    pub avg_latency: Duration,
-    pub std_latency: Duration,
-    pub med_latency: Duration,
-    pub min_latency: Duration,
-    pub max_latency: Duration,
+    pub avg_latency: String,
+    pub std_latency: String,
+    pub med_latency: String,
+    pub min_latency: String,
+    pub max_latency: String,
 }
 
 impl EchoTestSummary {
-    pub fn from_latencies(latencies: &Vec<u128>, char_count: usize) -> Self {
+    pub fn from_latencies(latencies: &Vec<u128>, char_count: usize, formatter: &Formatter) -> Self {
         let char_sent = latencies.len();
         let avg_latency = latencies.iter().sum::<u128>() / (char_sent as u128);
-        let std_latency = Duration::from_nanos(
+        let std_latency = formatter.format_duration(Duration::from_nanos(
             ((latencies
                 .iter()
                 .map(|&latency| ((latency as i128) - (avg_latency as i128)).pow(2))
                 .sum::<i128>() as f64)
                 / (char_sent as f64))
                 .sqrt() as u64,
-        );
-        let avg_latency = Duration::from_nanos(avg_latency as u64);
-        let med_latency = Duration::from_nanos(
+        ));
+        let avg_latency = formatter.format_duration(Duration::from_nanos(avg_latency as u64));
+        let med_latency = formatter.format_duration(Duration::from_nanos(
             (match char_sent % 2 {
                 0 => (latencies[char_sent / 2 - 1] + latencies[char_sent / 2]) / 2,
                 _ => latencies[char_sent / 2],
             }) as u64,
-        );
-        let min_latency = Duration::from_nanos(latencies.first().unwrap().to_owned() as u64);
-        let max_latency = Duration::from_nanos(latencies.last().unwrap().to_owned() as u64);
+        ));
+        let min_latency = formatter.format_duration(Duration::from_nanos(
+            latencies.first().unwrap().to_owned() as u64,
+        ));
+        let max_latency = formatter.format_duration(Duration::from_nanos(
+            latencies.last().unwrap().to_owned() as u64,
+        ));
         Self {
             char_count,
             char_sent,
@@ -43,45 +47,30 @@ impl EchoTestSummary {
             max_latency,
         }
     }
-    pub fn to_formatted_frame(&self, formatter: &Formatter) -> Vec<Record> {
+    pub fn to_formatted_frame(&self) -> Vec<Record> {
         vec![
-            Record::new(
-                "Latency",
-                "Average",
-                formatter.format_duration(self.avg_latency),
-            ),
-            Record::new(
-                "Latency",
-                "Std deviation",
-                formatter.format_duration(self.std_latency),
-            ),
-            Record::new(
-                "Latency",
-                "Median",
-                formatter.format_duration(self.med_latency),
-            ),
-            Record::new(
-                "Latency",
-                "Minimum",
-                formatter.format_duration(self.min_latency),
-            ),
-            Record::new(
-                "Latency",
-                "Maximum",
-                formatter.format_duration(self.max_latency),
-            ),
+            Record::new("Latency", "Average", self.avg_latency.clone()),
+            Record::new("Latency", "Std deviation", self.std_latency.clone()),
+            Record::new("Latency", "Median", self.med_latency.clone()),
+            Record::new("Latency", "Minimum", self.min_latency.clone()),
+            Record::new("Latency", "Maximum", self.max_latency.clone()),
         ]
     }
 }
 
 pub struct SpeedTestResult {
-    pub size: u64,
-    pub time: Duration,
+    pub size: String,
+    pub time: String,
+    pub speed: String,
 }
 
 impl SpeedTestResult {
-    pub fn speed(&self) -> u64 {
-        ((self.size as f64) / self.time.as_secs_f64()) as u64
+    pub fn new(size: u64, time: Duration, formatter: &Formatter) -> Self {
+        Self {
+            size: formatter.format_size(size),
+            time: formatter.format_duration(time),
+            speed: formatter.format_size(((size as f64) / time.as_secs_f64()) as u64) + "/s",
+        }
     }
 }
 
@@ -91,18 +80,10 @@ pub struct SpeedTestSummary {
 }
 
 impl SpeedTestSummary {
-    pub fn to_formatted_frame(&self, formatter: &Formatter) -> Vec<Record> {
+    pub fn to_formatted_frame(&self) -> Vec<Record> {
         vec![
-            Record::new(
-                "Speed",
-                "Upload",
-                formatter.format_size(self.upload.speed()) + "/s",
-            ),
-            Record::new(
-                "Speed",
-                "Download",
-                formatter.format_size(self.download.speed()) + "/s",
-            ),
+            Record::new("Speed", "Upload", self.upload.speed.clone()),
+            Record::new("Speed", "Download", self.download.speed.clone()),
         ]
     }
 }

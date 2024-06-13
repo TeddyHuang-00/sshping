@@ -82,7 +82,7 @@ pub fn run_echo_test(
 
     // Calculate latency statistics
     latencies.sort();
-    let result = EchoTestSummary::from_latencies(&latencies, char_count);
+    let result = EchoTestSummary::from_latencies(&latencies, char_count, formatter);
     if result.char_sent == 0 {
         return Err("Unable to get any echos in given time".to_string());
     }
@@ -118,11 +118,11 @@ pub fn run_echo_test(
         info!(
             "Sent {}/{char_count}, Latency:\n\tMean:\t{}\n\tStd:\t{}\n\tMin:\t{}\n\tMedian:\t{}\n\tMax:\t{}\n\t1% High:\t{}\n\t5% High:\t{}\n\t10% High:\t{}",
             result.char_sent,
-            formatter.format_duration(result.avg_latency),
-            formatter.format_duration(result.std_latency),
-            formatter.format_duration(result.min_latency),
-            formatter.format_duration(result.med_latency),
-            formatter.format_duration(result.max_latency),
+            result.avg_latency,
+            result.std_latency,
+            result.min_latency,
+            result.med_latency,
+            result.max_latency,
             formatter.format_duration(p1_latency),
             formatter.format_duration(p5_latency),
             formatter.format_duration(p10_latency)
@@ -157,10 +157,7 @@ pub fn run_upload_test(
     let start_time: Instant = Instant::now();
     let mut last_log_time = Instant::now();
     let log_interval = Duration::from_secs_f64(1.0 / 60.0);
-    let mut result = SpeedTestResult {
-        size: 0,
-        time: Duration::from_secs(0),
-    };
+    let mut result: SpeedTestResult;
 
     // Starting uploading file
     trace!("Sending file in chunks");
@@ -170,25 +167,21 @@ pub fn run_upload_test(
 
         if last_log_time.elapsed() > log_interval || log_enabled!(Level::Info) {
             last_log_time = Instant::now();
-            result.size = total_bytes_sent as u64;
-            result.time = start_time.elapsed();
+            result = SpeedTestResult::new(total_bytes_sent as u64, start_time.elapsed(), formatter);
             let log = format!(
                 "Sent {total_bytes_sent}/{size}, Average Speed: {}/s",
-                formatter.format_size(result.speed())
+                result.speed
             );
             print!("{log:<80}\r");
         }
     }
-    result.size = total_bytes_sent as u64;
-    result.time = start_time.elapsed();
+    result = SpeedTestResult::new(total_bytes_sent as u64, start_time.elapsed(), formatter);
     // Clean up the channel
     channel.send_eof().map_err(|e| e.to_string())?;
 
     info!(
         "Sent {}, Time Elapsed: {}, Average Speed: {}/s",
-        formatter.format_size(result.size),
-        formatter.format_duration(result.time),
-        formatter.format_size(result.speed())
+        result.size, result.time, result.speed
     );
 
     Ok(result)
@@ -216,10 +209,7 @@ pub fn run_download_test(
     let start_time: Instant = Instant::now();
     let mut last_log_time = Instant::now();
     let log_interval = Duration::from_secs_f64(1.0 / 60.0);
-    let mut result = SpeedTestResult {
-        size: 0,
-        time: Duration::from_secs(0),
-    };
+    let mut result: SpeedTestResult;
 
     // Starting downloading file
     trace!("Receiving file in chunks");
@@ -229,11 +219,10 @@ pub fn run_download_test(
 
         if last_log_time.elapsed() > log_interval || log_enabled!(Level::Info) {
             last_log_time = Instant::now();
-            result.size = total_bytes_recv as u64;
-            result.time = start_time.elapsed();
+            result = SpeedTestResult::new(total_bytes_recv as u64, start_time.elapsed(), formatter);
             let log = format!(
-                "Received {total_bytes_recv}/{size}, Average Speed: {}/s",
-                formatter.format_size(result.speed())
+                "Received {total_bytes_recv}/{size}, Average Speed: {}",
+                result.speed
             );
             print!("{log:<80}\r");
         }
@@ -243,16 +232,13 @@ pub fn run_download_test(
             .read_to_end(&mut buffer)
             .map_err(|e| e.to_string())? as u64;
     }
-    result.size = total_bytes_recv as u64;
-    result.time = start_time.elapsed();
+    result = SpeedTestResult::new(total_bytes_recv as u64, start_time.elapsed(), formatter);
     // Clean up the channel
     channel.send_eof().map_err(|e| e.to_string())?;
 
     info!(
         "Received {}, Time Elapsed: {}, Average Speed: {}/s",
-        formatter.format_size(result.size),
-        formatter.format_duration(result.time),
-        formatter.format_size(result.speed())
+        result.size, result.time, result.speed
     );
 
     Ok(result)
