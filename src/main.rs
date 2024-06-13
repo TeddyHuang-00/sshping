@@ -17,7 +17,7 @@ use std::net::TcpStream;
 use std::process::ExitCode;
 use summary::Record;
 use tabled::{
-    settings::{Alignment, Span},
+    settings::{style::BorderSpanCorrection, Alignment, Span},
     Table,
 };
 use tests::{run_echo_test, run_speed_test};
@@ -172,7 +172,10 @@ fn main() -> ExitCode {
     });
     table
         .with(Alignment::center())
-        .with(Alignment::center_vertical());
+        .with(Alignment::center_vertical())
+        .with(BorderSpanCorrection);
+    // Clear the line before printing the table
+    print!("{:<80}\r", "");
     println!("{}", table);
 
     // Waiting for key input before exiting
