@@ -1,0 +1,76 @@
+# Based on typst's release action:
+# https://github.com/typst/typst/blob/main/.github/workflows/release.yml
+
+name: Build Release Binaries
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-release:
+    name: release ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        feature:
+          - "include-openssl"
+          - ""
+        include:
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            cross: true
+          - target: armv7-unknown-linux-musleabi
+            os: ubuntu-latest
+            cross: true
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            cross: false
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            cross: false
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            cross: false
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Run Cross
+        if: ${{ matrix.cross }}
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross.git
+          cross build --release --target ${{ matrix.target }} --features ${{ matrix.feature }}
+
+      - name: Run Cargo
+        if: ${{ !matrix.cross }}
+        run: cargo build --release --target ${{ matrix.target }} --features ${{ matrix.feature }}
+
+      - name: create artifact directory
+        shell: bash
+        run: |
+          directory=sshping-${{ matrix.target }}-${{ matrix.feature }}
+          mkdir $directory
+          cp README.md LICENSE $directory
+          if [ -f target/${{ matrix.target }}/release/sshping.exe ]; then
+            cp target/${{ matrix.target }}/release/sshping.exe $directory
+            7z a -r $directory.zip $directory
+          else
+            cp target/${{ matrix.target }}/release/sshping $directory
+            tar cJf $directory.tar.xz $directory
+          fi
+
+      - uses: ncipollo/release-action@v1.14.0
+        with:
+          artifacts: "sshping-${{ matrix.target }}.*"
+          allowUpdates: true
+          omitNameDuringUpdate: true
+          omitBodyDuringUpdate: true
