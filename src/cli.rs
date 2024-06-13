@@ -2,6 +2,7 @@ use bytesize::ByteSize;
 use clap::{
     builder::{styling::AnsiColor, Styles},
     crate_authors, crate_description, crate_name, crate_version, ArgAction, Parser, ValueEnum,
+    ValueHint,
 };
 use shellexpand::tilde;
 use std::path::PathBuf;
@@ -17,12 +18,8 @@ use users::get_current_username;
 #[command(styles = get_styles())]
 pub struct Options {
     /// [user@]host[:port]
-    #[arg(value_parser = parse_target)]
+    #[arg(value_parser = parse_target, value_hint = ValueHint::Hostname)]
     pub target: Target,
-
-    /// Bind to this SOURCE address
-    #[arg(short, long, value_name = "SOURCE")]
-    pub bind_addr: Option<String>,
 
     /// Read the ssh config file FILE for options
     #[arg(
@@ -30,44 +27,82 @@ pub struct Options {
         long,
         value_name = "FILE",
         default_value = PathBuf::from("~/.ssh/config").into_os_string(),
-        value_parser = parse_local_path
+        value_parser = parse_local_path,
+        value_hint = ValueHint::FilePath
     )]
     pub config: PathBuf,
 
     /// Use identity FILE, i.e., ssh private key file
-    #[arg(short, long, value_name = "FILE", value_parser = parse_local_path)]
+    #[arg(
+        short,
+        long,
+        value_name = "FILE",
+        value_parser = parse_local_path,
+        value_hint = ValueHint::FilePath
+    )]
     pub identity: Option<PathBuf>,
 
     /// Use password PWD for authentication (not recommended)
-    #[arg(short, long, value_name = "PWD")]
+    #[arg(short, long, value_name = "PWD", value_hint = ValueHint::Other)]
     pub password: Option<String>,
 
     /// Time limit for ssh connection in seconds
-    #[arg(short = 'T', long, value_name = "SECONDS", default_value_t = 10.0)]
+    #[arg(
+        short = 'T',
+        long,
+        value_name = "SECONDS",
+        default_value_t = 10.0,
+        value_hint = ValueHint::Other
+    )]
     pub ssh_timeout: f64,
 
     /// Run TEST
-    #[arg(short, long, value_enum, value_name = "TEST", default_value_t = Test::Both)]
+    #[arg(
+        short,
+        long,
+        value_enum,
+        value_name = "TEST",
+        default_value_t = Test::Both,
+        value_hint = ValueHint::Other
+    )]
     pub run_tests: Test,
 
     /// Number of characters to echo
-    #[arg(short, long, value_name = "COUNT", default_value_t = 1000)]
+    #[arg(short, long, value_name = "COUNT", default_value_t = 1000, value_hint = ValueHint::Other)]
     pub char_count: usize,
 
     /// Use CMD for echo command
-    #[arg(short, long, value_name = "CMD", default_value = "cat > /dev/null")]
+    #[arg(
+        short,
+        long,
+        value_name = "CMD",
+        default_value = "cat > /dev/null",
+        value_hint = ValueHint::CommandString
+    )]
     pub echo_cmd: String,
 
     /// Time limit for echo test in seconds
-    #[arg(short = 't', long, value_name = "SECONDS")]
+    #[arg(short = 't', long, value_name = "SECONDS", value_hint = ValueHint::Other)]
     pub echo_timeout: Option<f64>,
 
     /// File SIZE for speed test
-    #[arg(short, long, default_value = "8.0MB", value_parser = parse_file_size)]
+    #[arg(
+        short,
+        long,
+        default_value = "8.0MB",
+        value_parser = parse_file_size,
+        value_hint = ValueHint::Other
+    )]
     pub size: u64,
 
     /// Chunk SIZE for splitting file in speed test
-    #[arg(short = 'u', long, default_value = "1.0MB", value_parser = parse_file_size)]
+    #[arg(
+        short = 'u',
+        long,
+        default_value = "1.0MB",
+        value_parser = parse_file_size,
+        value_hint = ValueHint::Other
+    )]
     pub chunk_size: u64,
 
     /// Remote FILE path for speed tests
@@ -75,12 +110,13 @@ pub struct Options {
         short = 'z',
         long,
         value_name = "FILE",
-        default_value = "/tmp/sshping-test.tmp"
+        default_value = "/tmp/sshping-test.tmp",
+        value_hint = ValueHint::FilePath
     )]
     pub remote_file: PathBuf,
 
     /// Specify delimiters to use (or None for not using) in big numbers
-    #[arg(short, long, default_value = ",")]
+    #[arg(short, long, default_value = ",", value_hint = ValueHint::Other)]
     pub delimiter: Option<char>,
 
     /// Append measurement in ping-like rtt format
