@@ -147,6 +147,34 @@ fn main() -> ExitCode {
         None
     };
 
+    // Output results
+    let mut data = vec![Record::new(
+        "SSH",
+        "Connect time",
+        formatter.format_duration(ssh_connect_time),
+    )];
+    let mut modifications = vec![];
+    let mut row_count = 1;
+    if let Some(result) = echo_test_result {
+        let records = result.to_formatted_frame(&formatter);
+        modifications.push(((row_count + 1, 0), Span::row(records.len())));
+        row_count += records.len();
+        data.extend(records);
+    }
+    if let Some(result) = speed_test_result {
+        let records = result.to_formatted_frame(&formatter);
+        modifications.push(((row_count + 1, 0), Span::row(records.len())));
+        data.extend(records);
+    }
+    let mut table = Table::new(data);
+    modifications.into_iter().for_each(|(span, span_mod)| {
+        table.modify(span, span_mod);
+    });
+    table
+        .with(Alignment::center())
+        .with(Alignment::center_vertical());
+    println!("{}", table);
+
     // Waiting for key input before exiting
     if opts.key_wait {
         println!("Press any key to exit...");
