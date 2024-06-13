@@ -60,9 +60,6 @@ fn main() -> ExitCode {
         if let Some(port) = params.port {
             opts.target.port = port;
         }
-        if let Some(bind_addr) = params.bind_address {
-            opts.bind_addr = Some(bind_addr);
-        }
         if let Some(identity) = params.identity_file {
             opts.identity = Some(identity[0].to_owned());
         }
