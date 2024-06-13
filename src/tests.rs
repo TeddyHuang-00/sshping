@@ -1,15 +1,19 @@
-use crate::summary::{EchoTestSummary, SpeedTestResult, SpeedTestSummary};
-use crate::util::Formatter;
+use std::{
+    io::{Read, Write},
+    path::PathBuf,
+    time::{Duration, Instant},
+};
+
 use log::{debug, info, log_enabled, trace, warn, Level};
 use rand::{
     distributions::{Distribution, Uniform},
     thread_rng,
 };
 use ssh2::Session;
-use std::{
-    io::{Read, Write},
-    path::PathBuf,
-    time::{Duration, Instant},
+
+use crate::{
+    summary::{EchoTestSummary, SpeedTestResult, SpeedTestSummary},
+    util::Formatter,
 };
 
 pub fn run_echo_test(

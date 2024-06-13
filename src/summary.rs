@@ -1,6 +1,8 @@
-use crate::util::Formatter;
 use std::time::Duration;
+
 use tabled::Tabled;
+
+use crate::util::Formatter;
 
 pub struct EchoTestSummary {
     pub char_sent: usize,

@@ -4,6 +4,13 @@ mod summary;
 mod tests;
 mod util;
 
+use std::{
+    fs::File,
+    io::{BufReader, Read},
+    net::TcpStream,
+    process::ExitCode,
+};
+
 use auth::authenticate_all;
 use clap::Parser;
 use cli::{Options, Test};
@@ -11,10 +18,6 @@ use log::{debug, error, trace, LevelFilter};
 use simple_logger::SimpleLogger;
 use ssh2::Session;
 use ssh2_config::{ParseRule, SshConfig};
-use std::fs::File;
-use std::io::{BufReader, Read};
-use std::net::TcpStream;
-use std::process::ExitCode;
 use summary::Record;
 use tabled::{
     settings::{style::BorderSpanCorrection, Alignment, Span},
@@ -101,7 +104,10 @@ fn main() -> ExitCode {
         }
     }
 
-    // Try to authenticate with the 1) first identity in the agent; 2) specified identity; 3) password
+    // Try to authenticate with the server using:
+    // 1) identity in the agent;
+    // 2) specified identity;
+    // 3) password
     let ssh_connect_time = match authenticate_all(
         &session,
         &opts.target.user,

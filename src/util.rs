@@ -1,6 +1,7 @@
+use std::time::Duration;
+
 use num_format::{Buffer, CustomFormat};
 use size::{Base, Size, Style};
-use std::time::Duration;
 
 pub struct Formatter {
     // Formatter style for large number

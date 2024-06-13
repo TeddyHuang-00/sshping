@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use bytesize::ByteSize;
 use clap::{
     builder::{styling::AnsiColor, Styles},
@@ -5,7 +7,6 @@ use clap::{
     ValueHint,
 };
 use shellexpand::tilde;
-use std::path::PathBuf;
 use whoami::username;
 
 // Define options struct
@@ -40,7 +41,8 @@ pub struct Options {
     ///
     /// Typically ~/.ssh/id_<algo> where <algo> is rsa, dsa, ecdsa, etc.
     ///
-    /// TIP: If you have already added the key to ssh-agent, you don't need to specify this
+    /// TIP: If you have already added the key to ssh-agent,
+    /// you don't need to specify this
     #[arg(
         short,
         long,
@@ -72,9 +74,11 @@ pub struct Options {
 
     /// Run TEST
     ///
-    /// Echo test: sends a large number of characters to the remote server and measures the latency
+    /// Echo test: sends a large number of characters to the remote server
+    /// and measures the latency
     ///
-    /// Speed test: sends/receives a large file through scp and measures the throughput
+    /// Speed test: sends/receives a large file through scp
+    /// and measures the throughput
     #[arg(
         short,
         long,
@@ -125,7 +129,8 @@ pub struct Options {
 
     /// Chunk SIZE for splitting file in speed test
     ///
-    /// Use a smaller value for better progress updates and a larger value for better throughput
+    /// Use a smaller value for better progress updates
+    /// and a larger value for better throughput
     ///
     /// Examples of possible value: 1.5K(B), 3Mi(B), 0.1Ki(B), 500(B)
     #[arg(
@@ -141,7 +146,8 @@ pub struct Options {
     ///
     /// The file will be created on the remote server for the speed test
     ///
-    /// NOTE: This file will not be deleted after the test, so it is recommended to be in /tmp
+    /// NOTE: This file will not be deleted after the test,
+    /// so it is recommended to be in /tmp
     #[arg(
         short = 'z',
         long,
