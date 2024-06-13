@@ -177,7 +177,7 @@ fn main() -> ExitCode {
 
     // Waiting for key input before exiting
     if opts.key_wait {
-        println!("Press any key to exit...");
+        println!("Press enter to exit...");
         let mut buf = [0u8; 1];
         let _ = std::io::stdin().read(&mut buf).unwrap();
     }

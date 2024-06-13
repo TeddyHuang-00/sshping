@@ -169,7 +169,7 @@ pub fn run_upload_test(
             last_log_time = Instant::now();
             result = SpeedTestResult::new(total_bytes_sent as u64, start_time.elapsed(), formatter);
             let log = format!(
-                "Sent {total_bytes_sent}/{size}, Average Speed: {}/s",
+                "Sent {total_bytes_sent}/{size}, Average Speed: {}",
                 result.speed
             );
             print!("{log:<80}\r");
@@ -180,7 +180,7 @@ pub fn run_upload_test(
     channel.send_eof().map_err(|e| e.to_string())?;
 
     info!(
-        "Sent {}, Time Elapsed: {}, Average Speed: {}/s",
+        "Sent {}, Time Elapsed: {}, Average Speed: {}",
         result.size, result.time, result.speed
     );
 
@@ -237,7 +237,7 @@ pub fn run_download_test(
     channel.send_eof().map_err(|e| e.to_string())?;
 
     info!(
-        "Received {}, Time Elapsed: {}, Average Speed: {}/s",
+        "Received {}, Time Elapsed: {}, Average Speed: {}",
         result.size, result.time, result.speed
     );
 
