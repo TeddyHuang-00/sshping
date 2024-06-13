@@ -88,25 +88,25 @@ Options:
 ## Examples
 
 ```sh
-$ sshping localhost -H
+$ sshping OverLAN -H
 +---------+---------------+-------------+
 |  Test   |    Metric     |   Result    |
 +---------+---------------+-------------+
-|   SSH   | Connect time  | 52ms 872us  |
+|   SSH   | Connect time  | 49ms 770us  |
 +---------+---------------+-------------+
-|         |    Average    | 39us 436ns  |
+|         |    Average    | 19us 415ns  |
 |         +---------------+-------------+
-|         | Std deviation | 16us 767ns  |
+|         | Std deviation |  30us 1ns   |
 |         +---------------+-------------+
-| Latency |    Median     | 31us 208ns  |
+| Latency |    Median     |  9us 811ns  |
 |         +---------------+-------------+
-|         |    Minimum    | 23us 708ns  |
+|         |    Minimum    |  9us 254ns  |
 |         +---------------+-------------+
-|         |    Maximum    | 172us 208ns |
+|         |    Maximum    | 206us 666ns |
 +---------+---------------+-------------+
-|         |    Upload     |  99.9 MB/s  |
+|         |    Upload     |  147 MB/s   |
 |  Speed  +---------------+-------------+
-|         |   Download    |  264 MB/s   |
+|         |   Download    |  96.6 MB/s  |
 +---------+---------------+-------------+
 ```
 
@@ -115,21 +115,21 @@ $ sshping localhost -d _
 +---------+---------------+-----------------+
 |  Test   |    Metric     |     Result      |
 +---------+---------------+-----------------+
-|   SSH   | Connect time  |  55_056_125ns   |
+|   SSH   | Connect time  |  49_725_720ns   |
 +---------+---------------+-----------------+
-|         |    Average    |    45_490ns     |
+|         |    Average    |    10_268ns     |
 |         +---------------+-----------------+
-|         | Std deviation |    39_150ns     |
+|         | Std deviation |     3_055ns     |
 |         +---------------+-----------------+
-| Latency |    Median     |    27_292ns     |
+| Latency |    Median     |     9_773ns     |
 |         +---------------+-----------------+
-|         |    Minimum    |    23_625ns     |
+|         |    Minimum    |     8_075ns     |
 |         +---------------+-----------------+
-|         |    Maximum    |    436_875ns    |
+|         |    Maximum    |    40_603ns     |
 +---------+---------------+-----------------+
-|         |    Upload     | 100_289_743 B/s |
+|         |    Upload     | 127_897_360 B/s |
 |  Speed  +---------------+-----------------+
-|         |   Download    | 258_341_257 B/s |
+|         |   Download    | 94_500_777 B/s  |
 +---------+---------------+-----------------+
 ```
 
@@ -137,13 +137,26 @@ $ sshping localhost -d _
 
 Contributions are welcome! Feel free to open an issue or a pull request. Anything from bug report to feature request to code contribution is appreciated.
 
+Currently, there are a few things that can be added but haven't been yet. If you would like to help but don't know where to start, you can check this list below:
+
+- [ ] Unit test
+- [ ] Man page generation
+- [ ] Shell autocompletion script generation
+- [ ] Packaging for various platforms
+- [ ] Table style customization
+- [ ] More SSH tests
+- [ ] Code optimization
+
 ## FAQ
 
 ### How to use public-private key pair for authentication?
 
-Using public-private key pair is recommended, you can either provide the identity file (private key) path through `-i` argument or use agent authentication by adding the identity file to your ssh-agent (assuming your private key is `~/.ssh/id_rsa`):
+Using public-private key pair is recommended, you can either provide the identity file (private key) path through `-i` argument or use agent authentication by adding the identity file to your ssh agent:
 
 ```sh
+# Start SSH agent if you haven't already
+eval `ssh-agent -s`
+# Add identity to agent (assuming it is `~/.ssh/id_rsa`)
 ssh-add ~/.ssh/id_rsa
 ```
 
