@@ -1,6 +1,14 @@
 # SSH ping
 
-A continuation and re-work of the original [ssh-ping](https://github.com/spook/sshping) in Rust.
+![Crates.io Version](https://img.shields.io/crates/v/sshping)
+![Crates.io License](https://img.shields.io/crates/l/sshping)
+![Crates.io Total Downloads](https://img.shields.io/crates/d/sshping)
+![Crates.io Downloads (latest version)](https://img.shields.io/crates/dv/sshping)
+![GitHub Repo stars](https://img.shields.io/github/stars/TeddyHuang-00/sshping)
+
+SSH-based ping that measures interactive character echo latency and file transfer throughput. Pronounced "shipping".
+
+> A continuation and re-work of the original [ssh-ping](https://github.com/spook/sshping) in Rust.
 
 ## Installation
 
@@ -12,11 +20,17 @@ A continuation and re-work of the original [ssh-ping](https://github.com/spook/s
 cargo install sshping
 ```
 
-You can also opt-in to the `include-openssl` feature to bundle OpenSSL with the binary, for rare cases where the system OpenSSL is not available:
+You can also opt in to the `include-openssl` feature to bundle OpenSSL with the binary, for rare cases where the system OpenSSL is not available:
 
 ```sh
 cargo install sshping -F include-openssl
 ```
+
+### Pre-built binaries
+
+Pre-built binaries are available on the [releases page](https://github.com/TeddyHuang-00/sshping/releases). You can download the binary for your platform and put it in your `$PATH`.
+
+Note that all pre-built binaries are built with the `include-openssl` feature enabled, so they are self-contained and do not require OpenSSL to be installed on the system.
 
 ### From source
 
@@ -46,8 +60,6 @@ cargo install --path . -F include-openssl
 ## Usage
 
 ```sh
-SSH-based ping that measures interactive character echo latency and file transfer throughput. Pronounced "shipping".
-
 Usage: sshping [OPTIONS] <TARGET>
 
 Arguments:
