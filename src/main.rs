@@ -1,5 +1,6 @@
 mod auth;
 mod cli;
+mod summary;
 mod tests;
 mod util;
 
@@ -14,6 +15,11 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::net::TcpStream;
 use std::process::ExitCode;
+use summary::Record;
+use tabled::{
+    settings::{Alignment, Span},
+    Table,
+};
 use tests::{run_echo_test, run_speed_test};
 use util::Formatter;
 

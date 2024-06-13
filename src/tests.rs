@@ -1,3 +1,4 @@
+use crate::summary::{EchoTestSummary, SpeedTestResult, SpeedTestSummary};
 use crate::util::Formatter;
 use log::{debug, info, log_enabled, trace, warn, Level};
 use rand::{
@@ -10,65 +11,6 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
-
-pub struct EchoTestSummary {
-    pub char_count: usize,
-    pub char_sent: usize,
-    pub avg_latency: Duration,
-    pub std_latency: Duration,
-    pub med_latency: Duration,
-    pub min_latency: Duration,
-    pub max_latency: Duration,
-}
-
-impl EchoTestSummary {
-    pub fn from_latencies(latencies: &Vec<u128>, char_count: usize) -> Self {
-        let char_sent = latencies.len();
-        let avg_latency = latencies.iter().sum::<u128>() / (char_sent as u128);
-        let std_latency = Duration::from_nanos(
-            ((latencies
-                .iter()
-                .map(|&latency| ((latency as i128) - (avg_latency as i128)).pow(2))
-                .sum::<i128>() as f64)
-                / (char_sent as f64))
-                .sqrt() as u64,
-        );
-        let avg_latency = Duration::from_nanos(avg_latency as u64);
-        let med_latency = Duration::from_nanos(
-            (match char_sent % 2 {
-                0 => (latencies[char_sent / 2 - 1] + latencies[char_sent / 2]) / 2,
-                _ => latencies[char_sent / 2],
-            }) as u64,
-        );
-        let min_latency = Duration::from_nanos(latencies.first().unwrap().to_owned() as u64);
-        let max_latency = Duration::from_nanos(latencies.last().unwrap().to_owned() as u64);
-        Self {
-            char_count,
-            char_sent,
-            avg_latency,
-            std_latency,
-            med_latency,
-            min_latency,
-            max_latency,
-        }
-    }
-}
-
-pub struct SpeedTestResult {
-    pub size: u64,
-    pub time: Duration,
-}
-
-impl SpeedTestResult {
-    pub fn speed(&self) -> u64 {
-        ((self.size as f64) / self.time.as_secs_f64()) as u64
-    }
-}
-
-pub struct SpeedTestSummary {
-    pub upload: SpeedTestResult,
-    pub download: SpeedTestResult,
-}
 
 pub fn run_echo_test(
     session: &Session,
