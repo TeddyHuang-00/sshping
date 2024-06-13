@@ -87,6 +87,8 @@ Options:
 
 ## Examples
 
+Ping a host from ssh config with human-readable output:
+
 ```sh
 $ sshping OverLAN -H
 +---------+---------------+-------------+
@@ -110,8 +112,10 @@ $ sshping OverLAN -H
 +---------+---------------+-------------+
 ```
 
+Ping a certain host with username and port, using `_` as delimiter and a specific identity file:
+
 ```sh
-$ sshping localhost -d _
+$ sshping user@host:7890 -i ~/.ssh/id_rsa -d _
 +---------+---------------+-----------------+
 |  Test   |    Metric     |     Result      |
 +---------+---------------+-----------------+
