@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "SSH-based ping that measures interactive character echo latency and file transfer throughput. Pronounced \"shipping\"."
 authors = ["Nan Huang <teddyhuangnan@gmail.com>"]
+license = "MIT"
 
 [dependencies]
 bytesize = "1.3.0"
