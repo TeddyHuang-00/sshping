@@ -119,10 +119,6 @@ pub struct Options {
     #[arg(short, long, default_value = ",", value_hint = ValueHint::Other)]
     pub delimiter: Option<char>,
 
-    /// Append measurement in ping-like rtt format
-    #[arg(short = 'P', long)]
-    pub ping_summary: bool,
-
     /// Use human-friendly units
     #[arg(short = 'H', long)]
     pub human_readable: bool,
