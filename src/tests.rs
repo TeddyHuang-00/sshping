@@ -26,18 +26,20 @@ impl EchoTestSummary {
         let char_sent = latencies.len();
         let avg_latency = latencies.iter().sum::<u128>() / (char_sent as u128);
         let std_latency = Duration::from_nanos(
-            (latencies
+            ((latencies
                 .iter()
                 .map(|&latency| ((latency as i128) - (avg_latency as i128)).pow(2))
-                .sum::<i128>() as f64
+                .sum::<i128>() as f64)
                 / (char_sent as f64))
                 .sqrt() as u64,
         );
         let avg_latency = Duration::from_nanos(avg_latency as u64);
-        let med_latency = Duration::from_nanos(match char_sent % 2 {
-            0 => (latencies[char_sent / 2 - 1] + latencies[char_sent / 2]) / 2,
-            _ => latencies[char_sent / 2],
-        } as u64);
+        let med_latency = Duration::from_nanos(
+            (match char_sent % 2 {
+                0 => (latencies[char_sent / 2 - 1] + latencies[char_sent / 2]) / 2,
+                _ => latencies[char_sent / 2],
+            }) as u64,
+        );
         let min_latency = Duration::from_nanos(latencies.first().unwrap().to_owned() as u64);
         let max_latency = Duration::from_nanos(latencies.last().unwrap().to_owned() as u64);
         Self {
@@ -230,7 +232,7 @@ pub fn run_upload_test(
             result.time = start_time.elapsed();
             let log = format!(
                 "Sent {total_bytes_sent}/{size}, Average Speed: {}/s",
-                formatter.format_size(result.speed()),
+                formatter.format_size(result.speed())
             );
             print!("{log:<80}\r");
         }
@@ -244,7 +246,7 @@ pub fn run_upload_test(
         "Sent {}, Time Elapsed: {}, Average Speed: {}/s",
         formatter.format_size(result.size),
         formatter.format_duration(result.time),
-        formatter.format_size(result.speed()),
+        formatter.format_size(result.speed())
     );
 
     Ok(result)
@@ -289,7 +291,7 @@ pub fn run_download_test(
             result.time = start_time.elapsed();
             let log = format!(
                 "Received {total_bytes_recv}/{size}, Average Speed: {}/s",
-                formatter.format_size(result.speed()),
+                formatter.format_size(result.speed())
             );
             print!("{log:<80}\r");
         }
@@ -308,7 +310,7 @@ pub fn run_download_test(
         "Received {}, Time Elapsed: {}, Average Speed: {}/s",
         formatter.format_size(result.size),
         formatter.format_duration(result.time),
-        formatter.format_size(result.speed()),
+        formatter.format_size(result.speed())
     );
 
     Ok(result)
