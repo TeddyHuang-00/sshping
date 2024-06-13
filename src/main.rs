@@ -119,30 +119,36 @@ fn main() -> ExitCode {
 
     // Running tests
     let echo_test_result = if opts.run_tests == Test::Echo || opts.run_tests == Test::Both {
-        Some(
-            run_echo_test(
-                &session,
-                &opts.echo_cmd,
-                opts.char_count,
-                opts.echo_timeout,
-                &formatter,
-            )
-            .unwrap(),
-        )
+        match run_echo_test(
+            &session,
+            &opts.echo_cmd,
+            opts.char_count,
+            opts.echo_timeout,
+            &formatter,
+        ) {
+            Ok(result) => Some(result),
+            Err(e) => {
+                error!("Failed to finish echo test: {e}");
+                return ExitCode::from(1);
+            }
+        }
     } else {
         None
     };
     let speed_test_result = if opts.run_tests == Test::Speed || opts.run_tests == Test::Both {
-        Some(
-            run_speed_test(
-                &session,
-                opts.size,
-                opts.chunk_size,
-                &opts.remote_file,
-                &formatter,
-            )
-            .unwrap(),
-        )
+        match run_speed_test(
+            &session,
+            opts.size,
+            opts.chunk_size,
+            &opts.remote_file,
+            &formatter,
+        ) {
+            Ok(result) => Some(result),
+            Err(e) => {
+                error!("Failed to finish speed test: {e}");
+                return ExitCode::from(1);
+            }
+        }
     } else {
         None
     };
