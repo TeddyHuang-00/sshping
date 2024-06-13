@@ -3,7 +3,6 @@ use std::time::Duration;
 use tabled::Tabled;
 
 pub struct EchoTestSummary {
-    pub char_count: usize,
     pub char_sent: usize,
     pub avg_latency: String,
     pub std_latency: String,
@@ -13,7 +12,7 @@ pub struct EchoTestSummary {
 }
 
 impl EchoTestSummary {
-    pub fn from_latencies(latencies: &Vec<u128>, char_count: usize, formatter: &Formatter) -> Self {
+    pub fn from_latencies(latencies: &Vec<u128>, formatter: &Formatter) -> Self {
         let char_sent = latencies.len();
         let avg_latency = latencies.iter().sum::<u128>() / (char_sent as u128);
         let std_latency = formatter.format_duration(Duration::from_nanos(
@@ -38,7 +37,6 @@ impl EchoTestSummary {
             latencies.last().unwrap().to_owned() as u64,
         ));
         Self {
-            char_count,
             char_sent,
             avg_latency,
             std_latency,

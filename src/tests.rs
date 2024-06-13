@@ -82,7 +82,7 @@ pub fn run_echo_test(
 
     // Calculate latency statistics
     latencies.sort();
-    let result = EchoTestSummary::from_latencies(&latencies, char_count, formatter);
+    let result = EchoTestSummary::from_latencies(&latencies, formatter);
     if result.char_sent == 0 {
         return Err("Unable to get any echos in given time".to_string());
     }
