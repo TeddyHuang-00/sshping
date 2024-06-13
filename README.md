@@ -47,6 +47,8 @@ ssh-add ~/.ssh/id_rsa
 
 Many features like `ProxyJump` are currently not supported due to the limitation of upstream libraries.
 
+Bind address is dropped since the upstream library does not support it.
+
 ---
 
 If more than one identity file is given in the configuration file, only the first one will be used.
