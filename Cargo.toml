@@ -17,4 +17,5 @@ simple_logger = "5.0.0"
 size = "0.4.1"
 ssh2 = { version = "0.9.4", features = ["vendored-openssl"] }
 ssh2-config = "0.2.3"
+tabled = "0.15.0"
 users = "0.11.0"
