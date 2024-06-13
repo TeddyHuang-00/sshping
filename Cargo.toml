@@ -22,4 +22,5 @@ tabled = "0.15.0"
 users = "0.11.0"
 
 [features]
+default = []
 include-openssl = ["ssh2/vendored-openssl"]
