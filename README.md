@@ -2,6 +2,47 @@
 
 A continuation and re-work of the original [ssh-ping](https://github.com/spook/sshping) in Rust.
 
+## Installation
+
+### Cargo
+
+`sshping` is published on [crates.io](https://crates.io/crates/sshping), you can install it with (first having rust toolchain installed):
+
+```sh
+cargo install sshping
+```
+
+You can also opt-in to the `include-openssl` feature to bundle OpenSSL with the binary, for rare cases where the system OpenSSL is not available:
+
+```sh
+cargo install sshping -F include-openssl
+```
+
+### From source
+
+To install from source, you can clone the repository first:
+
+```sh
+git clone git@github.com:TeddyHuang-00/sshping.git
+# Or
+git clone https://github.com/TeddyHuang-00/sshping.git
+
+# Then
+cd sshping
+```
+
+Then build and install it with cargo:
+
+```sh
+cargo install --path .
+```
+
+As with the `include-openssl` feature, you can also enable it when installing from source:
+
+```sh
+cargo install --path . -F include-openssl
+```
+
 ## Usage
 
 ```sh
@@ -79,6 +120,10 @@ $ sshping localhost -d _
 |         |   Download    | 258_341_257 B/s |
 +---------+---------------+-----------------+
 ```
+
+## Contributing
+
+Contributions are welcome! Feel free to open an issue or a pull request. Anything from bug report to feature request to code contribution is appreciated.
 
 ## FAQ
 
