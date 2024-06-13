@@ -6,7 +6,7 @@ mod util;
 use auth::authenticate_all;
 use clap::Parser;
 use cli::{Options, Test};
-use log::{debug, error, info, trace, LevelFilter};
+use log::{debug, error, trace, LevelFilter};
 use simple_logger::SimpleLogger;
 use ssh2::Session;
 use ssh2_config::{ParseRule, SshConfig};
@@ -16,9 +16,6 @@ use std::net::TcpStream;
 use std::process::ExitCode;
 use tests::{run_echo_test, run_speed_test};
 use util::Formatter;
-
-// use std::path::Path;
-// use std::time::Duration;
 
 fn main() -> ExitCode {
     let mut opts = Options::parse();
