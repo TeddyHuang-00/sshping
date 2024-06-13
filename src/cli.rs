@@ -6,7 +6,7 @@ use clap::{
 };
 use shellexpand::tilde;
 use std::path::PathBuf;
-use users::get_current_username;
+use whoami::username;
 
 // Define options struct
 #[derive(Parser, Debug)]
@@ -207,13 +207,7 @@ fn parse_target(s: &str) -> Result<Target, String> {
     let mut parts = s.split('@');
     let user = match parts.clone().count() {
         // Get the current username if not specified
-        1 => {
-            if let Some(user) = get_current_username() {
-                user.to_string_lossy().to_string()
-            } else {
-                return Err("Failed to get current username".to_string());
-            }
-        }
+        1 => username(),
         // Or use the specified username
         2 => parts.next().unwrap().to_string(),
         // Throw an error if @ present more than once
