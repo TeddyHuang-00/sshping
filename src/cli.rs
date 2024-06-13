@@ -22,6 +22,10 @@ pub struct Options {
     pub target: Target,
 
     /// Read the ssh config file FILE for options
+    ///
+    /// We get the user, host, port and identity file from ssh config
+    ///
+    /// NOTE: Options like bind address, proxy jump, etc. are not supported
     #[arg(
         short = 'f',
         long,
@@ -33,6 +37,10 @@ pub struct Options {
     pub config: PathBuf,
 
     /// Use identity FILE, i.e., ssh private key file
+    ///
+    /// Typically ~/.ssh/id_<algo> where <algo> is rsa, dsa, ecdsa, etc.
+    ///
+    /// TIP: If you have already added the key to ssh-agent, you don't need to specify this
     #[arg(
         short,
         long,
@@ -43,10 +51,16 @@ pub struct Options {
     pub identity: Option<PathBuf>,
 
     /// Use password PWD for authentication (not recommended)
+    ///
+    /// WARNING: Password authentication is not recommended for security reasons
+    ///
+    /// Please use public key authentication instead where possible
     #[arg(short, long, value_name = "PWD", value_hint = ValueHint::Other)]
     pub password: Option<String>,
 
     /// Time limit for ssh connection in seconds
+    ///
+    /// Timeout for all the ssh operations including authentication
     #[arg(
         short = 'T',
         long,
@@ -57,6 +71,10 @@ pub struct Options {
     pub ssh_timeout: f64,
 
     /// Run TEST
+    ///
+    /// Echo test: sends a large number of characters to the remote server and measures the latency
+    ///
+    /// Speed test: sends/receives a large file through scp and measures the throughput
     #[arg(
         short,
         long,
@@ -72,6 +90,10 @@ pub struct Options {
     pub char_count: usize,
 
     /// Use CMD for echo command
+    ///
+    /// Should capture all following input and discard them safely
+    ///
+    /// NOTE: This command should not exit immediately
     #[arg(
         short,
         long,
@@ -82,10 +104,16 @@ pub struct Options {
     pub echo_cmd: String,
 
     /// Time limit for echo test in seconds
+    ///
+    /// Early termination of the echo test if exceeding this time limit
     #[arg(short = 't', long, value_name = "SECONDS", value_hint = ValueHint::Other)]
     pub echo_timeout: Option<f64>,
 
     /// File SIZE for speed test
+    ///
+    /// Not recommended to use very small sizes for accurate results
+    ///
+    /// Examples of possible value: 1.5K(B), 3Mi(B), 0.1Ki(B), 500(B)
     #[arg(
         short,
         long,
@@ -96,6 +124,10 @@ pub struct Options {
     pub size: u64,
 
     /// Chunk SIZE for splitting file in speed test
+    ///
+    /// Use a smaller value for better progress updates and a larger value for better throughput
+    ///
+    /// Examples of possible value: 1.5K(B), 3Mi(B), 0.1Ki(B), 500(B)
     #[arg(
         short = 'u',
         long,
@@ -106,6 +138,10 @@ pub struct Options {
     pub chunk_size: u64,
 
     /// Remote FILE path for speed tests
+    ///
+    /// The file will be created on the remote server for the speed test
+    ///
+    /// NOTE: This file will not be deleted after the test, so it is recommended to be in /tmp
     #[arg(
         short = 'z',
         long,
@@ -116,10 +152,20 @@ pub struct Options {
     pub remote_file: PathBuf,
 
     /// Specify delimiters to use (or None for not using) in big numbers
+    ///
+    /// Used to separate digits in big numbers for better readability
+    ///
+    /// This option is only used in non- human readable mode
+    ///
+    /// Examples of possible value: ",", " ", "_", None
     #[arg(short, long, default_value = ",", value_hint = ValueHint::Other)]
     pub delimiter: Option<char>,
 
     /// Use human-friendly units
+    ///
+    /// Big numbers will be formatted in human-friendly units
+    ///
+    /// Examples: 1.5 MB/s, 1s 259ms
     #[arg(short = 'H', long)]
     pub human_readable: bool,
 
@@ -128,6 +174,14 @@ pub struct Options {
     pub key_wait: bool,
 
     /// Show verbose output, use multiple for more noise
+    ///
+    /// -v: Show warnings
+    ///
+    /// -vv: Show info messages
+    ///
+    /// -vvv: Show debug messages
+    ///
+    /// -vvvv: Show trace messages
     #[arg(short, long, action = ArgAction::Count)]
     pub verbose: u8,
 }
