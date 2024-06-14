@@ -1,5 +1,6 @@
 mod auth;
 mod cli;
+mod style;
 mod summary;
 mod tests;
 mod util;
@@ -182,7 +183,8 @@ fn main() -> ExitCode {
     modifications.into_iter().for_each(|(span, span_mod)| {
         table.modify(span, span_mod);
     });
-    table
+    opts.table_style
+        .stylize(&mut table)
         .with(Alignment::center())
         .with(Alignment::center_vertical())
         .with(BorderSpanCorrection);

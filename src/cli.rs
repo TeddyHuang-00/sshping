@@ -9,6 +9,8 @@ use clap::{
 use shellexpand::tilde;
 use whoami::username;
 
+use crate::style::TableStyle;
+
 // Define options struct
 #[derive(Parser, Debug)]
 #[command(name = crate_name!())]
@@ -156,6 +158,20 @@ pub struct Options {
         value_hint = ValueHint::FilePath
     )]
     pub remote_file: PathBuf,
+
+    /// Table style for output
+    ///
+    /// See https://github.com/zhiburt/tabled?tab=readme-ov-file#styles
+    /// for examples
+    #[arg(
+        short = 'b',
+        long,
+        value_enum,
+        value_name = "STYLE",
+        default_value_t = TableStyle::ASCII,
+        value_hint = ValueHint::Other
+    )]
+    pub table_style: TableStyle,
 
     /// Specify delimiters to use (or None for not using) in big numbers
     ///
