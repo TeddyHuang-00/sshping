@@ -11,20 +11,16 @@ pub struct Formatter {
 
 impl Formatter {
     pub fn new(human_readable: bool, delimit: Option<char>) -> Self {
-        let format = if human_readable {
-            None
-        } else {
-            Some(
-                CustomFormat::builder()
-                    .separator(
-                        delimit
-                            .and_then(|ch| Some(ch.to_string()))
-                            .unwrap_or_default(),
-                    )
-                    .build()
-                    .unwrap(),
-            )
-        };
+        let format = human_readable.then(|| {
+            CustomFormat::builder()
+                .separator(
+                    delimit
+                        .and_then(|ch| Some(ch.to_string()))
+                        .unwrap_or_default(),
+                )
+                .build()
+                .unwrap()
+        });
 
         Self { format }
     }
