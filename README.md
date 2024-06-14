@@ -156,6 +156,7 @@ Currently, there are a few things that can be added but haven't been yet. If you
 - [ ] Shell autocompletion script generation
 - [ ] Packaging for various platforms
 - [ ] More SSH tests
+- [ ] Better error handling
 - [ ] Code optimization
 
 ## FAQ
