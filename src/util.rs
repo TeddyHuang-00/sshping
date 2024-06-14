@@ -11,7 +11,7 @@ pub struct Formatter {
 
 impl Formatter {
     pub fn new(human_readable: bool, delimit: Option<char>) -> Self {
-        let format = human_readable.then(|| {
+        let format = (!human_readable).then(|| {
             CustomFormat::builder()
                 .separator(
                     delimit
