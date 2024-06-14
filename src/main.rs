@@ -84,14 +84,14 @@ fn main() -> ExitCode {
         Ok(tcp) => tcp,
         Err(e) => {
             error!("Failed to connect to server: {e}");
-            return ExitCode::from(1);
+            return ExitCode::FAILURE;
         }
     };
     let mut session = match Session::new() {
         Ok(session) => session,
         Err(e) => {
             error!("Failed to create session: {e}");
-            return ExitCode::from(1);
+            return ExitCode::FAILURE;
         }
     };
     session.set_timeout((opts.ssh_timeout * 1000.0) as u32);
@@ -100,7 +100,7 @@ fn main() -> ExitCode {
         Ok(_) => {}
         Err(e) => {
             error!("Failed to handshake: {e}");
-            return ExitCode::from(1);
+            return ExitCode::FAILURE;
         }
     }
 
@@ -117,7 +117,7 @@ fn main() -> ExitCode {
         Ok(time) => time,
         Err(e) => {
             error!("Exiting due to authenticate: {e}");
-            return ExitCode::from(1);
+            return ExitCode::FAILURE;
         }
     };
     // Make sure we succeeded
@@ -135,7 +135,7 @@ fn main() -> ExitCode {
             Ok(result) => Some(result),
             Err(e) => {
                 error!("Failed to finish echo test: {e}");
-                return ExitCode::from(1);
+                return ExitCode::FAILURE;
             }
         }
     } else {
@@ -152,7 +152,7 @@ fn main() -> ExitCode {
             Ok(result) => Some(result),
             Err(e) => {
                 error!("Failed to finish speed test: {e}");
-                return ExitCode::from(1);
+                return ExitCode::FAILURE;
             }
         }
     } else {
@@ -198,5 +198,5 @@ fn main() -> ExitCode {
     }
 
     // Exit successfully
-    ExitCode::from(0)
+    ExitCode::SUCCESS
 }
