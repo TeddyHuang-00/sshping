@@ -26,6 +26,14 @@ You can also opt in to the `include-openssl` feature to bundle OpenSSL with the 
 cargo install sshping -F include-openssl
 ```
 
+### Homebrew (macOS/Linux)
+
+`sshping` is also available on Homebrew/Linuxbrew, you can install it with:
+
+```sh
+brew install TeddyHuang-00/app/sshping
+```
+
 ### Pre-built binaries
 
 Pre-built binaries are available on the [releases page](https://github.com/TeddyHuang-00/sshping/releases). You can download the binary for your platform and put it in your `$PATH`.
