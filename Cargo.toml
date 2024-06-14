@@ -8,7 +8,7 @@ license = "MIT"
 
 [dependencies]
 bytesize = "1.3.0"
-clap = { version = "4.5.7", features = ["derive", "string", "cargo", "color"] }
+clap = { version = "4.5.7", features = ["derive", "string", "cargo", "color", "wrap_help"] }
 humantime = "2.1.0"
 log = "0.4.21"
 num-format = "0.4.4"
