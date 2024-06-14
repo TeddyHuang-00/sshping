@@ -60,9 +60,11 @@ jobs:
           if [ -f target/${{ matrix.target }}/release/sshping.exe ]; then
             cp target/${{ matrix.target }}/release/sshping.exe $directory
             7z a -r $directory.zip $directory
+            shasum -a 256 $directory.zip > $directory.zip.sha256
           else
             cp target/${{ matrix.target }}/release/sshping $directory
             tar cJf $directory.tar.xz $directory
+            shasum -a 256 $directory.tar.xz > $directory.tar.xz.sha256
           fi
 
       - uses: ncipollo/release-action@v1.14.0
