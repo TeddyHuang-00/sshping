@@ -247,7 +247,7 @@ fn parse_file_size(s: &str) -> Result<u64, String> {
     Ok(size)
 }
 
-pub fn get_styles() -> Styles {
+fn get_styles() -> Styles {
     Styles::styled()
         .header(AnsiColor::Green.on_default().bold())
         .usage(AnsiColor::Green.on_default().bold())

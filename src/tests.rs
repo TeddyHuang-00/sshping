@@ -135,7 +135,7 @@ pub fn run_echo_test(
     Ok(result)
 }
 
-pub fn run_upload_test(
+fn run_upload_test(
     session: &Session,
     size: u64,
     chunk_size: u64,
@@ -191,7 +191,7 @@ pub fn run_upload_test(
     Ok(result)
 }
 
-pub fn run_download_test(
+fn run_download_test(
     session: &Session,
     chunk_size: u64,
     remote_file: &PathBuf,
