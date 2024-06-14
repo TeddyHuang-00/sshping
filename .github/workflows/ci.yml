@@ -4,6 +4,8 @@
 name: Test Build Binaries
 on:
   push:
+    tags-ignore:
+      - "**"
   workflow_dispatch:
 
 jobs:
