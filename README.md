@@ -77,6 +77,7 @@ Options:
   -s, --size <SIZE>              File SIZE for speed test [default: 8.0MB]
   -u, --chunk-size <CHUNK_SIZE>  Chunk SIZE for splitting file in speed test [default: 1.0MB]
   -z, --remote-file <FILE>       Remote FILE path for speed tests [default: /tmp/sshping-test.tmp]
+  -b, --table-style <STYLE>      Table style for output [default: ascii] [possible values: empty, blank, ascii, psql, markdown, modern, sharp, extended, dots, rst, rounded, ascii-rounded, modern-rounded]
   -d, --delimiter <DELIMITER>    Specify delimiters to use (or None for not using) in big numbers [default: ,]
   -H, --human-readable           Use human-friendly units
   -k, --key-wait                 Wait for keyboard input before exiting
@@ -87,29 +88,29 @@ Options:
 
 ## Examples
 
-Ping a host from ssh config with human-readable output:
+Ping a host from ssh config with human-readable output and modern table style with rounded corners:
 
 ```sh
-$ sshping OverLAN -H
-+---------+---------------+-------------+
-|  Test   |    Metric     |   Result    |
-+---------+---------------+-------------+
-|   SSH   | Connect time  | 49ms 770us  |
-+---------+---------------+-------------+
-|         |    Average    | 19us 415ns  |
-|         +---------------+-------------+
-|         | Std deviation |  30us 1ns   |
-|         +---------------+-------------+
-| Latency |    Median     |  9us 811ns  |
-|         +---------------+-------------+
-|         |    Minimum    |  9us 254ns  |
-|         +---------------+-------------+
-|         |    Maximum    | 206us 666ns |
-+---------+---------------+-------------+
-|         |    Upload     |  147 MB/s   |
-|  Speed  +---------------+-------------+
-|         |   Download    |  96.6 MB/s  |
-+---------+---------------+-------------+
+$ sshping OverLAN -H -b modern-rounded
+╭─────────┬───────────────┬─────────────╮
+│  Test   │    Metric     │   Result    │
+├─────────┼───────────────┼─────────────┤
+│   SSH   │ Connect time  │ 49ms 775us  │
+├─────────┼───────────────┼─────────────┤
+│         │    Average    │ 177us 731ns │
+│         ├───────────────┼─────────────┤
+│         │ Std deviation │ 59us 706ns  │
+│         ├───────────────┼─────────────┤
+│ Latency │    Median     │ 203us 263ns │
+│         ├───────────────┼─────────────┤
+│         │    Minimum    │ 11us 387ns  │
+│         ├───────────────┼─────────────┤
+│         │    Maximum    │ 270us 20ns  │
+├─────────┼───────────────┼─────────────┤
+│         │    Upload     │  153 MB/s   │
+│  Speed  ├───────────────┼─────────────┤
+│         │   Download    │  89.2 MB/s  │
+╰─────────┴───────────────┴─────────────╯
 ```
 
 Ping a certain host with username and port, using `_` as delimiter and a specific identity file:
@@ -143,11 +144,11 @@ Contributions are welcome! Feel free to open an issue or a pull request. Anythin
 
 Currently, there are a few things that can be added but haven't been yet. If you would like to help but don't know where to start, you can check this list below:
 
+- [x] Table style customization
 - [ ] Unit test
 - [ ] Man page generation
 - [ ] Shell autocompletion script generation
 - [ ] Packaging for various platforms
-- [ ] Table style customization
 - [ ] More SSH tests
 - [ ] Code optimization
 
