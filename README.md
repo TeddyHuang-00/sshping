@@ -66,19 +66,25 @@ Arguments:
   <TARGET>  [user@]host[:port]
 
 Options:
-  -f, --config <FILE>            Read the ssh config file FILE for options [default: ~/.ssh/config]
+  -f, --config <FILE>            Read the ssh config file FILE for options [default:
+                                 ~/.ssh/config]
   -i, --identity <FILE>          Use identity FILE, i.e., ssh private key file
   -p, --password <PWD>           Use password PWD for authentication (not recommended)
   -T, --ssh-timeout <SECONDS>    Time limit for ssh connection in seconds [default: 10]
-  -r, --run-tests <TEST>         Run TEST [default: both] [possible values: echo, speed, both]
+  -r, --run-tests <TEST>         Run TEST [default: both] [possible values: echo, speed,
+                                 both]
   -c, --char-count <COUNT>       Number of characters to echo [default: 1000]
   -e, --echo-cmd <CMD>           Use CMD for echo command [default: "cat > /dev/null"]
   -t, --echo-timeout <SECONDS>   Time limit for echo test in seconds
   -s, --size <SIZE>              File SIZE for speed test [default: 8.0MB]
   -u, --chunk-size <CHUNK_SIZE>  Chunk SIZE for splitting file in speed test [default: 1.0MB]
-  -z, --remote-file <FILE>       Remote FILE path for speed tests [default: /tmp/sshping-test.tmp]
-  -b, --table-style <STYLE>      Table style for output [default: ascii] [possible values: empty, blank, ascii, psql, markdown, modern, sharp, extended, dots, rst, rounded, ascii-rounded, modern-rounded]
-  -d, --delimiter <DELIMITER>    Specify delimiters to use (or None for not using) in big numbers [default: ,]
+  -z, --remote-file <FILE>       Remote FILE path for speed tests [default:
+                                 /tmp/sshping-test.tmp]
+  -b, --table-style <STYLE>      Table style for output [default: ascii] [possible values:
+                                 empty, blank, ascii, psql, markdown, modern, sharp,
+                                 extended, dots, rst, rounded, ascii-rounded, modern-rounded]
+  -d, --delimiter <DELIMITER>    Specify delimiters to use (or None for not using) in big
+                                 numbers [default: ,]
   -H, --human-readable           Use human-friendly units
   -k, --key-wait                 Wait for keyboard input before exiting
   -v, --verbose...               Show verbose output, use multiple for more noise
