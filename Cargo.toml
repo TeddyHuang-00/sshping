@@ -18,7 +18,7 @@ simple_logger = "5.0.0"
 size = "0.4.1"
 ssh2 = "0.9.4"
 ssh2-config = "0.2.3"
-tabled = "0.15.0"
+tabled = "0.16.0"
 whoami = "1.5.1"
 
 [features]
