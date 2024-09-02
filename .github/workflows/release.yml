@@ -51,7 +51,12 @@ jobs:
         if: ${{ !matrix.cross }}
         run: cargo build --release --target ${{ matrix.target }} --features include-openssl
 
-      - name: create artifact directory
+      - name: Setup python for checksums
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.x"
+
+      - name: Create artifact directory
         shell: bash
         run: |
           directory=sshping-${{ matrix.target }}
@@ -60,14 +65,15 @@ jobs:
           if [ -f target/${{ matrix.target }}/release/sshping.exe ]; then
             cp target/${{ matrix.target }}/release/sshping.exe $directory
             7z a -r $directory.zip $directory
-            shasum -a 256 $directory.zip > $directory.zip.sha256
+            python3 -c "import hashlib; open('$directory.zip.sha256', 'w').write(hashlib.file_digest(open('$directory.zip', 'rb'), 'sha256').hexdigest())"
           else
             cp target/${{ matrix.target }}/release/sshping $directory
             tar cJf $directory.tar.xz $directory
-            shasum -a 256 $directory.tar.xz > $directory.tar.xz.sha256
+            python3 -c "import hashlib; open('$directory.tar.xz.sha256', 'w').write(hashlib.file_digest(open('$directory.tar.xz', 'rb'), 'sha256').hexdigest())"
           fi
 
-      - uses: ncipollo/release-action@v1.14.0
+      - name: Upload Release
+        uses: ncipollo/release-action@v1.14.0
         with:
           artifacts: "sshping-${{ matrix.target }}.*"
           allowUpdates: true
