@@ -4,6 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use log::{debug, info, log_enabled, trace, warn, Level};
 use rand::{
     distributions::{Distribution, Uniform},
@@ -15,6 +16,21 @@ use crate::{
     summary::{EchoTestSummary, SpeedTestResult, SpeedTestSummary},
     util::Formatter,
 };
+
+fn get_progress_bar_style(test_name: &str) -> ProgressStyle {
+    ProgressStyle::default_bar()
+        .template(
+            &format!(
+                "{name} {{spinner:.green}} [{{elapsed_precise}}] [{{wide_bar:.cyan/blue}}] {{bytes}}/{{total_bytes}} ({{eta}})",
+                name = test_name
+            )
+        )
+        .unwrap()
+        .with_key("eta", |state: &ProgressState, w: &mut dyn std::fmt::Write|
+            write!(w, "{:.1}s", state.eta().as_secs_f64()).unwrap()
+        )
+        .progress_chars("#>-")
+}
 
 pub fn run_echo_test(
     session: &Session,
@@ -48,14 +64,13 @@ pub fn run_echo_test(
 
     // Prepare the echo test
     trace!("Testing echo latency");
-    let mut total_latency = 0;
     let write_buffer = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     let mut read_buffer = [0; 1];
     let mut latencies = Vec::with_capacity(char_count);
     let timeout = time_limit.map(|time| Duration::from_secs_f64(time));
     let start_time = Instant::now();
-    let mut last_log_time = Instant::now();
-    let log_interval = Duration::from_secs_f64(1.0 / 60.0);
+    let progress_bar = ProgressBar::new(char_count as u64);
+    progress_bar.set_style(get_progress_bar_style("Echo test"));
 
     for (n, idx) in (0..char_count).zip((0..write_buffer.len()).cycle()) {
         let start = Instant::now();
@@ -66,23 +81,15 @@ pub fn run_echo_test(
             .read_exact(&mut read_buffer)
             .map_err(|e| e.to_string())?;
         let latency = start.elapsed().as_nanos();
-        total_latency += latency;
         latencies.push(latency);
         if let Some(timeout) = timeout {
             if start_time.elapsed() > timeout {
                 break;
             }
         }
-        if last_log_time.elapsed() > log_interval || log_enabled!(Level::Info) {
-            last_log_time = Instant::now();
-            let avg_latency = Duration::from_nanos((total_latency as u64) / ((n + 1) as u64));
-            let log = format!(
-                "Ping {n}/{char_count}, Average Latency: {}",
-                formatter.format_duration(avg_latency)
-            );
-            print!("{log:<80}\r");
-        }
+        progress_bar.set_position((n as u64) + 1);
     }
+    progress_bar.finish_and_clear();
 
     // Calculate latency statistics
     latencies.sort();
@@ -159,30 +166,21 @@ fn run_upload_test(
     // Preparing logging variables
     let mut total_bytes_sent = 0;
     let start_time: Instant = Instant::now();
-    let mut last_log_time = Instant::now();
-    let log_interval = Duration::from_secs_f64(1.0 / 60.0);
-    let mut result: SpeedTestResult;
+    let progress_bar = ProgressBar::new(size);
+    progress_bar.set_style(get_progress_bar_style("Upload test"));
 
     // Starting uploading file
     trace!("Sending file in chunks");
     for chunk in buffer.as_bytes().chunks(chunk_size as usize) {
         channel.write_all(chunk).map_err(|e| e.to_string())?;
         total_bytes_sent += chunk.len();
-
-        if last_log_time.elapsed() > log_interval || log_enabled!(Level::Info) {
-            last_log_time = Instant::now();
-            result = SpeedTestResult::new(total_bytes_sent as u64, start_time.elapsed(), formatter);
-            let log = format!(
-                "Sent {total_bytes_sent}/{size}, Average Speed: {}",
-                result.speed
-            );
-            print!("{log:<80}\r");
-        }
+        progress_bar.set_position(total_bytes_sent as u64);
     }
-    result = SpeedTestResult::new(total_bytes_sent as u64, start_time.elapsed(), formatter);
+    progress_bar.finish_and_clear();
     // Clean up the channel
     channel.send_eof().map_err(|e| e.to_string())?;
 
+    let result = SpeedTestResult::new(total_bytes_sent as u64, start_time.elapsed(), formatter);
     info!(
         "Sent {}, Time Elapsed: {}, Average Speed: {}",
         result.size, result.time, result.speed
@@ -211,35 +209,27 @@ fn run_download_test(
     // Preparing logging variables
     let mut total_bytes_recv = 0;
     let start_time: Instant = Instant::now();
-    let mut last_log_time = Instant::now();
-    let log_interval = Duration::from_secs_f64(1.0 / 60.0);
-    let mut result: SpeedTestResult;
+    let progress_bar = ProgressBar::new(size);
+    progress_bar.set_style(get_progress_bar_style("Download test"));
 
     // Starting downloading file
     trace!("Receiving file in chunks");
     while size - total_bytes_recv > chunk_size {
         channel.read_exact(&mut buffer).map_err(|e| e.to_string())?;
         total_bytes_recv += chunk_size;
-
-        if last_log_time.elapsed() > log_interval || log_enabled!(Level::Info) {
-            last_log_time = Instant::now();
-            result = SpeedTestResult::new(total_bytes_recv as u64, start_time.elapsed(), formatter);
-            let log = format!(
-                "Received {total_bytes_recv}/{size}, Average Speed: {}",
-                result.speed
-            );
-            print!("{log:<80}\r");
-        }
+        progress_bar.set_position(total_bytes_recv as u64);
     }
     if size - total_bytes_recv > 0 {
         total_bytes_recv += channel
             .read_to_end(&mut buffer)
             .map_err(|e| e.to_string())? as u64;
+        progress_bar.set_position(total_bytes_recv as u64);
     }
-    result = SpeedTestResult::new(total_bytes_recv as u64, start_time.elapsed(), formatter);
+    progress_bar.finish_and_clear();
     // Clean up the channel
     channel.send_eof().map_err(|e| e.to_string())?;
 
+    let result = SpeedTestResult::new(total_bytes_recv as u64, start_time.elapsed(), formatter);
     info!(
         "Received {}, Time Elapsed: {}, Average Speed: {}",
         result.size, result.time, result.speed
