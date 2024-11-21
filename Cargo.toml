@@ -15,6 +15,7 @@ clap = { version = "4.5.7", features = [
   "color",
   "wrap_help",
 ] }
+clap_complete = "4.5.38"
 humantime = "2.1.0"
 indicatif = "0.17.8"
 log = "0.4.21"

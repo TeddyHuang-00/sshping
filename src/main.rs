@@ -7,13 +7,14 @@ mod util;
 
 use std::{
     fs::File,
-    io::{BufReader, Read},
+    io::{stdout, BufReader, Read},
     net::TcpStream,
-    process::ExitCode,
+    process::{exit, ExitCode},
 };
 
 use auth::authenticate_all;
-use clap::Parser;
+use clap::{CommandFactory, Parser};
+use clap_complete::generate;
 use cli::{Options, Test};
 use log::{debug, error, trace, LevelFilter};
 use simple_logger::SimpleLogger;
@@ -29,6 +30,10 @@ use util::Formatter;
 
 fn main() -> ExitCode {
     let mut opts = Options::parse();
+    if let Some(shell) = opts.completions {
+        generate(shell, &mut Options::command(), "sshping", &mut stdout());
+        exit(0);
+    }
 
     // Initialize logging
     SimpleLogger::new()
