@@ -6,6 +6,7 @@ use clap::{
     crate_authors, crate_description, crate_name, crate_version, ArgAction, Parser, ValueEnum,
     ValueHint,
 };
+use clap_complete::Shell;
 use shellexpand::tilde;
 use whoami::username;
 
@@ -21,7 +22,7 @@ use crate::style::TableStyle;
 #[command(styles = get_styles())]
 pub struct Options {
     /// [user@]host[:port]
-    #[arg(value_parser = parse_target, value_hint = ValueHint::Hostname)]
+    #[arg(value_parser = parse_target, value_hint = ValueHint::Hostname, group = "main_action", default_value = "")]
     pub target: Target,
 
     /// Read the ssh config file FILE for options
@@ -206,6 +207,15 @@ pub struct Options {
     /// -vvvv: Show trace messages
     #[arg(short, long, action = ArgAction::Count)]
     pub verbose: u8,
+
+    /// Print completions for the given shell (instead of doing anything else).
+    /// These can be loaded/stored permanently, but they can also be sourced directly.
+    /// For example:
+    ///
+    ///  source <(sshping --completions zsh) # zsh
+    ///  sshping --completions fish | source # fish
+    #[clap(long, verbatim_doc_comment, id = "SHELL", group = "main_action")]
+    pub completions: Option<Shell>,
 }
 
 #[derive(ValueEnum, Clone, PartialEq, Eq, Debug)]
