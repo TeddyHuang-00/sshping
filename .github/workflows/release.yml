@@ -73,7 +73,7 @@ jobs:
           fi
 
       - name: Upload Release
-        uses: ncipollo/release-action@v1.14.0
+        uses: ncipollo/release-action@v1.15.0
         with:
           artifacts: "sshping-${{ matrix.target }}.*"
           allowUpdates: true
@@ -96,7 +96,7 @@ jobs:
           tag: ${{ github.event.release.tag_name }}
           writeToFile: false
       - name: Update Release
-        uses: ncipollo/release-action@v1.14.0
+        uses: ncipollo/release-action@v1.15.0
         with:
           allowUpdates: true
           body: ${{ steps.changelog.outputs.changes }}
