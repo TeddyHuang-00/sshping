@@ -5,10 +5,10 @@ use std::{
 };
 
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use log::{debug, info, log_enabled, trace, warn, Level};
+use log::{Level, debug, info, log_enabled, trace, warn};
 use rand::{
-    distributions::{Distribution, Uniform},
-    thread_rng,
+    distr::{Distribution, Uniform},
+    rng,
 };
 use ssh2::Session;
 
@@ -157,9 +157,9 @@ fn run_upload_test(
         .map_err(|e| e.to_string())?;
     // Generate random data to upload
     trace!("Generating random data");
-    let dist = Uniform::from(0..128 as u8);
+    let dist = Uniform::try_from(0..128_u8).unwrap();
     let buffer = dist
-        .sample_iter(thread_rng())
+        .sample_iter(rng())
         .take(size as usize)
         .map(|v| ((v & 0x3f) + 32) as char)
         .collect::<String>();
