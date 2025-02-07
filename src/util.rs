@@ -13,11 +13,7 @@ impl Formatter {
     pub fn new(human_readable: bool, delimit: Option<char>) -> Self {
         let format = (!human_readable).then(|| {
             CustomFormat::builder()
-                .separator(
-                    delimit
-                        .and_then(|ch| Some(ch.to_string()))
-                        .unwrap_or_default(),
-                )
+                .separator(delimit.map(|ch| ch.to_string()).unwrap_or_default())
                 .build()
                 .unwrap()
         });

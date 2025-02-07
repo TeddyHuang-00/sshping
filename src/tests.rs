@@ -1,6 +1,6 @@
 use std::{
     io::{Read, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::{Duration, Instant},
 };
 
@@ -67,7 +67,7 @@ pub fn run_echo_test(
     let write_buffer = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     let mut read_buffer = [0; 1];
     let mut latencies = Vec::with_capacity(char_count);
-    let timeout = time_limit.map(|time| Duration::from_secs_f64(time));
+    let timeout = time_limit.map(Duration::from_secs_f64);
     let start_time = Instant::now();
     let progress_bar = ProgressBar::new(char_count as u64);
     progress_bar.set_style(get_progress_bar_style("Echo test"));
@@ -146,14 +146,14 @@ fn run_upload_test(
     session: &Session,
     size: u64,
     chunk_size: u64,
-    remote_file: &PathBuf,
+    remote_file: &Path,
     formatter: &Formatter,
 ) -> Result<SpeedTestResult, String> {
     info!("Running upload speed test");
     // Prepare the upload test
     trace!("Establishing SCP channel");
     let mut channel = session
-        .scp_send(&remote_file, 0o644, size, None)
+        .scp_send(remote_file, 0o644, size, None)
         .map_err(|e| e.to_string())?;
     // Generate random data to upload
     trace!("Generating random data");
@@ -192,13 +192,13 @@ fn run_upload_test(
 fn run_download_test(
     session: &Session,
     chunk_size: u64,
-    remote_file: &PathBuf,
+    remote_file: &Path,
     formatter: &Formatter,
 ) -> Result<SpeedTestResult, String> {
     info!("Running download speed test");
     // Prepare the upload test
     trace!("Establishing SCP channel");
-    let (mut channel, stat) = session.scp_recv(&remote_file).map_err(|e| e.to_string())?;
+    let (mut channel, stat) = session.scp_recv(remote_file).map_err(|e| e.to_string())?;
     let size = stat.size();
     if size == 0 {
         return Err("Remote file is empty".to_string());
@@ -217,19 +217,19 @@ fn run_download_test(
     while size - total_bytes_recv > chunk_size {
         channel.read_exact(&mut buffer).map_err(|e| e.to_string())?;
         total_bytes_recv += chunk_size;
-        progress_bar.set_position(total_bytes_recv as u64);
+        progress_bar.set_position(total_bytes_recv);
     }
     if size - total_bytes_recv > 0 {
         total_bytes_recv += channel
             .read_to_end(&mut buffer)
             .map_err(|e| e.to_string())? as u64;
-        progress_bar.set_position(total_bytes_recv as u64);
+        progress_bar.set_position(total_bytes_recv);
     }
     progress_bar.finish_and_clear();
     // Clean up the channel
     channel.send_eof().map_err(|e| e.to_string())?;
 
-    let result = SpeedTestResult::new(total_bytes_recv as u64, start_time.elapsed(), formatter);
+    let result = SpeedTestResult::new(total_bytes_recv, start_time.elapsed(), formatter);
     info!(
         "Received {}, Time Elapsed: {}, Average Speed: {}",
         result.size, result.time, result.speed

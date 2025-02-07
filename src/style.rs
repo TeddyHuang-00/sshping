@@ -1,6 +1,7 @@
 use clap::ValueEnum;
-use tabled::{settings::Style, Table};
+use tabled::{Table, settings::Style};
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(ValueEnum, Clone, PartialEq, Eq, Debug)]
 pub enum TableStyle {
     Empty,

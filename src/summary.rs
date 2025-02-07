@@ -14,7 +14,7 @@ pub struct EchoTestSummary {
 }
 
 impl EchoTestSummary {
-    pub fn from_latencies(latencies: &Vec<u128>, formatter: &Formatter) -> Self {
+    pub fn from_latencies(latencies: &[u128], formatter: &Formatter) -> Self {
         let char_sent = latencies.len();
         let avg_latency = latencies.iter().sum::<u128>() / (char_sent as u128);
         let std_latency = formatter.format_duration(Duration::from_nanos(
