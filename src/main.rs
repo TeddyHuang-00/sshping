@@ -7,23 +7,23 @@ mod util;
 
 use std::{
     fs::File,
-    io::{stdout, BufReader, Read},
+    io::{BufReader, Read, stdout},
     net::TcpStream,
-    process::{exit, ExitCode},
+    process::{ExitCode, exit},
 };
 
 use auth::authenticate_all;
 use clap::{CommandFactory, Parser};
 use clap_complete::generate;
 use cli::{Options, Test};
-use log::{debug, error, trace, LevelFilter};
+use log::{LevelFilter, debug, error, trace};
 use simple_logger::SimpleLogger;
 use ssh2::Session;
 use ssh2_config::{ParseRule, SshConfig};
 use summary::Record;
 use tabled::{
-    settings::{style::BorderSpanCorrection, Alignment, Span},
     Table,
+    settings::{Alignment, Span, style::BorderSpanCorrection},
 };
 use tests::{run_echo_test, run_speed_test};
 use util::Formatter;
@@ -38,16 +38,13 @@ fn main() -> ExitCode {
     // Initialize logging
     SimpleLogger::new()
         .with_level(LevelFilter::Off)
-        .with_module_level(
-            "sshping",
-            match opts.verbose {
-                0 => LevelFilter::Error,
-                1 => LevelFilter::Warn,
-                2 => LevelFilter::Info,
-                3 => LevelFilter::Debug,
-                4.. => LevelFilter::Trace,
-            },
-        )
+        .with_module_level("sshping", match opts.verbose {
+            0 => LevelFilter::Error,
+            1 => LevelFilter::Warn,
+            2 => LevelFilter::Info,
+            3 => LevelFilter::Debug,
+            4.. => LevelFilter::Trace,
+        })
         .without_timestamps()
         .init()
         .unwrap();
@@ -175,13 +172,19 @@ fn main() -> ExitCode {
     let mut row_count = 1;
     if let Some(result) = echo_test_result {
         let records = result.to_formatted_frame();
-        modifications.push(((row_count + 1, 0), Span::row(records.len())));
+        modifications.push((
+            (row_count + 1, 0),
+            Span::row(records.len().try_into().unwrap()),
+        ));
         row_count += records.len();
         data.extend(records);
     }
     if let Some(result) = speed_test_result {
         let records = result.to_formatted_frame();
-        modifications.push(((row_count + 1, 0), Span::row(records.len())));
+        modifications.push((
+            (row_count + 1, 0),
+            Span::row(records.len().try_into().unwrap()),
+        ));
         data.extend(records);
     }
     let mut table = Table::new(data);
