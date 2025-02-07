@@ -1,5 +1,5 @@
 use clap::ValueEnum;
-use tabled::{Table, settings::Style};
+use tabled::{settings::Style, Table};
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(ValueEnum, Clone, PartialEq, Eq, Debug)]

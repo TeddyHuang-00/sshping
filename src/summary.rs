@@ -1,9 +1,11 @@
 use std::time::Duration;
 
+use serde::{Deserialize, Serialize};
 use tabled::Tabled;
 
 use crate::util::Formatter;
 
+#[derive(Serialize, Deserialize)]
 pub struct EchoTestSummary {
     pub char_sent: usize,
     pub avg_latency: String,
@@ -58,6 +60,7 @@ impl EchoTestSummary {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct SpeedTestResult {
     pub size: String,
     pub time: String,
@@ -74,6 +77,7 @@ impl SpeedTestResult {
     }
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct SpeedTestSummary {
     pub upload: SpeedTestResult,
     pub download: SpeedTestResult,

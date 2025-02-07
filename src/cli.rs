@@ -40,6 +40,20 @@ pub struct Options {
     )]
     pub config: PathBuf,
 
+    /// Output format
+    ///
+    /// NOTE: JSON format will not be written to a file. Redirect the
+    /// output to a file if needed
+    #[arg(
+        short = 'o',
+        long,
+        value_enum,
+        value_name = "FORMAT",
+        default_value_t = Format::Table,
+        value_hint = ValueHint::Other
+    )]
+    pub format: Format,
+
     /// Use identity FILE, i.e., ssh private key file
     ///
     /// Typically ~/.ssh/id_<algo> where <algo> is rsa, dsa, ecdsa, etc.
@@ -209,8 +223,8 @@ pub struct Options {
     pub verbose: u8,
 
     /// Print completions for the given shell (instead of doing anything else).
-    /// These can be loaded/stored permanently, but they can also be sourced directly.
-    /// For example:
+    /// These can be loaded/stored permanently, but they can also be sourced
+    /// directly. For example:
     ///
     ///  source <(sshping --completions zsh) # zsh
     ///  sshping --completions fish | source # fish
@@ -233,6 +247,14 @@ pub struct Target {
     pub user: String,
     pub host: String,
     pub port: u16,
+}
+
+#[derive(ValueEnum, Clone, PartialEq, Eq, Debug)]
+pub enum Format {
+    /// Table in console
+    Table,
+    /// JSON format
+    Json,
 }
 
 fn parse_target(s: &str) -> Result<Target, String> {

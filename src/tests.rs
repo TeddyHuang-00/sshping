@@ -5,7 +5,7 @@ use std::{
 };
 
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
-use log::{Level, debug, info, log_enabled, trace, warn};
+use log::{debug, info, log_enabled, trace, warn, Level};
 use rand::{
     distr::{Distribution, Uniform},
     rng,
