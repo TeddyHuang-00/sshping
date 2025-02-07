@@ -74,28 +74,25 @@ Arguments:
   <TARGET>  [user@]host[:port]
 
 Options:
-  -f, --config <FILE>            Read the ssh config file FILE for options [default:
-                                 ~/.ssh/config]
+  -f, --config <FILE>            Read the ssh config file FILE for options [default: ~/.ssh/config]
+  -o, --format <FORMAT>          Output format [default: table] [possible values: table, json]
   -i, --identity <FILE>          Use identity FILE, i.e., ssh private key file
   -p, --password <PWD>           Use password PWD for authentication (not recommended)
   -T, --ssh-timeout <SECONDS>    Time limit for ssh connection in seconds [default: 10]
-  -r, --run-tests <TEST>         Run TEST [default: both] [possible values: echo, speed,
-                                 both]
+  -r, --run-tests <TEST>         Run TEST [default: both] [possible values: echo, speed, both]
   -c, --char-count <COUNT>       Number of characters to echo [default: 1000]
   -e, --echo-cmd <CMD>           Use CMD for echo command [default: "cat > /dev/null"]
   -t, --echo-timeout <SECONDS>   Time limit for echo test in seconds
   -s, --size <SIZE>              File SIZE for speed test [default: 8.0MB]
   -u, --chunk-size <CHUNK_SIZE>  Chunk SIZE for splitting file in speed test [default: 1.0MB]
-  -z, --remote-file <FILE>       Remote FILE path for speed tests [default:
-                                 /tmp/sshping-test.tmp]
-  -b, --table-style <STYLE>      Table style for output [default: ascii] [possible values:
-                                 empty, blank, ascii, psql, markdown, modern, sharp,
-                                 extended, dots, rst, rounded, ascii-rounded, modern-rounded]
-  -d, --delimiter <DELIMITER>    Specify delimiters to use (or None for not using) in big
-                                 numbers [default: ,]
+  -z, --remote-file <FILE>       Remote FILE path for speed tests [default: /tmp/sshping-test.tmp]
+  -b, --table-style <STYLE>      Table style for output [default: ascii] [possible values: empty, blank, ascii, psql, markdown, modern, sharp, extended, dots, rst, rounded, ascii-rounded,
+                                 modern-rounded]
+  -d, --delimiter <DELIMITER>    Specify delimiters to use (or None for not using) in big numbers [default: ,]
   -H, --human-readable           Use human-friendly units
   -k, --key-wait                 Wait for keyboard input before exiting
   -v, --verbose...               Show verbose output, use multiple for more noise
+      --completions <SHELL>      Print completions for the given shell and quit. [possible values: bash, elvish, fish, powershell, zsh]
   -h, --help                     Print help (see more with '--help')
   -V, --version                  Print version
 ```
@@ -150,6 +147,42 @@ $ sshping user@host:7890 -i ~/.ssh/id_rsa -d _
 |  Speed  +---------------+-----------------+
 |         |   Download    | 94_500_777 B/s  |
 +---------+---------------+-----------------+
+```
+
+Output results in JSON format:
+
+```sh
+$ sshping user@host -H -o json
+{
+  "echo_test": {
+    "avg_latency": "12us 135ns",
+    "char_sent": 1000,
+    "max_latency": "70us 550ns",
+    "med_latency": "10us 943ns",
+    "min_latency": "6us 690ns",
+    "std_latency": "4us 580ns"
+  },
+  "speed_test": {
+    "download": {
+      "size": "8.00 MB",
+      "speed": "88.4 MB/s",
+      "time": "90ms 516us"
+    },
+    "upload": {
+      "size": "8.00 MB",
+      "speed": "123 MB/s",
+      "time": "64ms 781us"
+    }
+  },
+  "ssh_connect_time": "35ms 998us"
+}
+```
+
+Generate shell autocompletion script for bash:
+
+```sh
+$ sshping --completions bash > sshping.bash
+$ source sshping.bash
 ```
 
 ## Contributing
