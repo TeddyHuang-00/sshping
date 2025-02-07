@@ -7,6 +7,7 @@ use clap::{
     ValueHint,
 };
 use clap_complete::Shell;
+use regex::Regex;
 use shellexpand::tilde;
 use whoami::username;
 
@@ -22,7 +23,7 @@ use crate::style::TableStyle;
 #[command(styles = get_styles())]
 pub struct Options {
     /// [user@]host[:port]
-    #[arg(value_parser = parse_target, value_hint = ValueHint::Hostname, group = "main_action", default_value = "")]
+    #[arg(value_parser = parse_target, value_hint = ValueHint::Hostname, group = "main_action")]
     pub target: Target,
 
     /// Read the ssh config file FILE for options
@@ -222,12 +223,14 @@ pub struct Options {
     #[arg(short, long, action = ArgAction::Count)]
     pub verbose: u8,
 
-    /// Print completions for the given shell (instead of doing anything else).
+    /// Print completions for the given shell and quit.
+    ///
     /// These can be loaded/stored permanently, but they can also be sourced
     /// directly. For example:
-    ///
-    ///  source <(sshping --completions zsh) # zsh
-    ///  sshping --completions fish | source # fish
+    /// ```
+    /// $ source <(sshping --completions zsh) # zsh
+    /// $ sshping --completions fish | source # fish
+    /// ```
     #[clap(long, verbatim_doc_comment, id = "SHELL", group = "main_action")]
     pub completions: Option<Shell>,
 }
@@ -258,30 +261,15 @@ pub enum Format {
 }
 
 fn parse_target(s: &str) -> Result<Target, String> {
-    let mut parts = s.split('@');
-    let user = match parts.clone().count() {
-        // Get the current username if not specified
-        1 => username(),
-        // Or use the specified username
-        2 => parts.next().unwrap().to_string(),
-        // Throw an error if @ present more than once
-        _ => {
-            return Err("Invalid target format. Must be [user@]host[:port]".to_string());
-        }
-    };
-    let mut parts = parts.next().unwrap().split(':');
-    let host = parts.next().unwrap().to_string();
-    let port = match parts.clone().count() {
-        // Use default port 22 if not specified
-        0 => 22,
-        // Or use the specified port
-        1 => parts.next().unwrap().parse().unwrap(),
-        // Throw an error if : present more than once
-        _ => {
-            return Err("Invalid target format. Must be [user@]host[:port]".to_string());
-        }
-    };
-    Ok(Target { user, host, port })
+    let pat = Regex::new(r"^(?:([a-zA-Z0-9_.-]+)@)?([a-zA-Z0-9_.-]+)(?::(\d+))?$").unwrap();
+    if let Some(cap) = pat.captures(s) {
+        let user = cap.get(1).map_or(username(), |m| m.as_str().to_string());
+        let host = cap.get(2).unwrap().as_str().to_string();
+        let port = cap.get(3).map_or(22, |m| m.as_str().parse().unwrap());
+        Ok(Target { user, host, port })
+    } else {
+        Err("Invalid target format. Must be [user@]host[:port]".to_string())
+    }
 }
 
 fn parse_local_path(s: &str) -> Result<PathBuf, String> {
