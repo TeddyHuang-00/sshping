@@ -80,6 +80,15 @@ jobs:
           omitNameDuringUpdate: true
           omitBodyDuringUpdate: true
 
+      - name: Upload Shell Completion
+        if: ${{ matrix.target == 'x86_64-unknown-linux-musl' }}
+        uses: ncipollo/release-action@v1.15.0
+        with:
+          artifacts: "target/${{ matrix.target }}/release/completions/*"
+          allowUpdates: true
+          omitNameDuringUpdate: true
+          omitBodyDuringUpdate: true
+
   update-changelog:
     name: Update Changelog
     runs-on: ubuntu-latest
