@@ -1,6 +1,6 @@
 [package]
 name = "sshping"
-version = "0.1.5"
+version = "0.2.0"
 edition = "2021"
 description = "SSH-based ping that measures interactive character echo latency and file transfer throughput. Pronounced \"shipping\"."
 authors = ["Nan Huang <teddyhuangnan@gmail.com>"]
