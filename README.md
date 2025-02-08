@@ -86,13 +86,11 @@ Options:
   -s, --size <SIZE>              File SIZE for speed test [default: 8.0MB]
   -u, --chunk-size <CHUNK_SIZE>  Chunk SIZE for splitting file in speed test [default: 1.0MB]
   -z, --remote-file <FILE>       Remote FILE path for speed tests [default: /tmp/sshping-test.tmp]
-  -b, --table-style <STYLE>      Table style for output [default: ascii] [possible values: empty, blank, ascii, psql, markdown, modern, sharp, extended, dots, rst, rounded, ascii-rounded,
-                                 modern-rounded]
+  -b, --table-style <STYLE>      Table style for output [default: ascii] [possible values: empty, blank, ascii, psql, markdown, modern, sharp, extended, dots, rst, rounded, ascii-rounded, modern-rounded]
   -d, --delimiter <DELIMITER>    Specify delimiters to use (or None for not using) in big numbers [default: ,]
   -H, --human-readable           Use human-friendly units
   -k, --key-wait                 Wait for keyboard input before exiting
   -v, --verbose...               Show verbose output, use multiple for more noise
-      --completions <SHELL>      Print completions for the given shell and quit. [possible values: bash, elvish, fish, powershell, zsh]
   -h, --help                     Print help (see more with '--help')
   -V, --version                  Print version
 ```
@@ -178,13 +176,6 @@ $ sshping user@host -H -o json
 }
 ```
 
-Generate shell autocompletion script for bash:
-
-```sh
-$ sshping --completions bash > sshping.bash
-$ source sshping.bash
-```
-
 ## Contributing
 
 Contributions are welcome! Feel free to open an issue or a pull request. Anything from bug report to feature request to code contribution is appreciated.
@@ -222,3 +213,7 @@ If they got implemented in the upstream libraries, they will be added to this pr
 ### Why isn't all my identity file in SSH config being used?
 
 If more than one identity file is given in the configuration file, only the first one will be used. This is an opinionated design choice to keep the implementation simple.
+
+### Shell autocompletion doesn't work
+
+Make sure you have downloaded the completion script and sourced it in your shell profile, or place it in the appropriate directory for your shell.
