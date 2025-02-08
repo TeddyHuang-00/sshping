@@ -6,12 +6,48 @@ use clap::{
     crate_authors, crate_description, crate_name, crate_version, ArgAction, Parser, ValueEnum,
     ValueHint,
 };
-use clap_complete::Shell;
 use regex::Regex;
 use shellexpand::tilde;
+use tabled::{settings::Style, Table};
 use whoami::username;
 
-use crate::style::TableStyle;
+#[allow(clippy::upper_case_acronyms)]
+#[derive(ValueEnum, Clone, PartialEq, Eq, Debug)]
+pub enum TableStyle {
+    Empty,
+    Blank,
+    ASCII,
+    PSQL,
+    Markdown,
+    Modern,
+    Sharp,
+    Extended,
+    Dots,
+    RST,
+    Rounded,
+    ASCIIRounded,
+    ModernRounded,
+}
+
+impl TableStyle {
+    pub fn stylize<'a>(&self, table: &'a mut Table) -> &'a mut Table {
+        match self {
+            TableStyle::Empty => table.with(Style::empty()),
+            TableStyle::Blank => table.with(Style::blank()),
+            TableStyle::ASCII => table.with(Style::ascii()),
+            TableStyle::PSQL => table.with(Style::psql()),
+            TableStyle::Markdown => table.with(Style::markdown()),
+            TableStyle::Modern => table.with(Style::modern()),
+            TableStyle::Sharp => table.with(Style::sharp()),
+            TableStyle::Extended => table.with(Style::extended()),
+            TableStyle::Dots => table.with(Style::dots()),
+            TableStyle::RST => table.with(Style::re_structured_text()),
+            TableStyle::Rounded => table.with(Style::rounded()),
+            TableStyle::ASCIIRounded => table.with(Style::ascii_rounded()),
+            TableStyle::ModernRounded => table.with(Style::modern_rounded()),
+        }
+    }
+}
 
 // Define options struct
 #[derive(Parser, Debug)]
@@ -222,17 +258,6 @@ pub struct Options {
     /// -vvvv: Show trace messages
     #[arg(short, long, action = ArgAction::Count)]
     pub verbose: u8,
-
-    /// Print completions for the given shell and quit.
-    ///
-    /// These can be loaded/stored permanently, but they can also be sourced
-    /// directly. For example:
-    /// ```
-    /// $ source <(sshping --completions zsh) # zsh
-    /// $ sshping --completions fish | source # fish
-    /// ```
-    #[clap(long, verbatim_doc_comment, id = "SHELL", group = "main_action")]
-    pub completions: Option<Shell>,
 }
 
 #[derive(ValueEnum, Clone, PartialEq, Eq, Debug)]

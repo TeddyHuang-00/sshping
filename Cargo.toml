@@ -15,7 +15,6 @@ clap = { version = "4.5.7", features = [
   "color",
   "wrap_help",
 ] }
-clap_complete = "4.5.38"
 humantime = "2.1.0"
 indicatif = "0.17.8"
 log = "0.4.21"
@@ -29,6 +28,23 @@ simple_logger = "5.0.0"
 size = "0.5.0"
 ssh2 = "0.9.4"
 ssh2-config = "0.3.0"
+tabled = "0.18.0"
+whoami = "1.5.1"
+
+[build-dependencies]
+bytesize = "1.3.0"
+clap = { version = "4.5.7", features = [
+  "derive",
+  "string",
+  "cargo",
+  "color",
+  "wrap_help",
+] }
+clap_complete = "4.5.44"
+regex = "1.11.1"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.138"
+shellexpand = "3.1.0"
 tabled = "0.18.0"
 whoami = "1.5.1"
 
