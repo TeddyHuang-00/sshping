@@ -4,9 +4,6 @@
 name: Test Build Binaries
 on:
   push:
-    branches:
-      - main
-      - "renovate/**"
     paths-ignore:
       - ".github/**"
     tags-ignore:
