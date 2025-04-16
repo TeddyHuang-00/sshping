@@ -65,7 +65,7 @@ jobs:
         if: ${{ matrix.cross }}
         run: |
           cargo install cross --git https://github.com/cross-rs/cross.git
-          cross build --release --target ${{ matrix.target }} --features ${{ matrix.feature }}
+          PKG_CONFIG_ALLOW_CROSS=1 cross build --release --target ${{ matrix.target }} --features ${{ matrix.feature }}
 
       - name: Run Cargo
         if: ${{ !matrix.cross }}
