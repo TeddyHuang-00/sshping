@@ -49,7 +49,7 @@ jobs:
           target: ${{ matrix.target }}
 
       - name: Run Build
-        run: cargo build --locked --release --target ${{ matrix.target }} -F {{ matrix.feature }}
+        run: cargo build --locked --release --target ${{ matrix.target }} -F ${{ matrix.feature }}
 
       - name: Setup python for checksums
         uses: actions/setup-python@v5
