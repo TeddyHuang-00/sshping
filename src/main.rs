@@ -20,7 +20,7 @@ use ssh2::Session;
 use ssh2_config::{ParseRule, SshConfig};
 use summary::Record;
 use tabled::{
-    settings::{style::BorderSpanCorrection, Alignment, Span},
+    settings::{themes::BorderCorrection, Alignment, Span},
     Table,
 };
 use tests::{run_echo_test, run_speed_test};
@@ -194,7 +194,7 @@ fn main() -> ExitCode {
                 .stylize(&mut table)
                 .with(Alignment::center())
                 .with(Alignment::center_vertical())
-                .with(BorderSpanCorrection);
+                .with(BorderCorrection::span());
             // Clear the line before printing the table
             print!("{:<80}\r", "");
             println!("{}", table);
