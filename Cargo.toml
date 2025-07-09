@@ -27,7 +27,7 @@ shellexpand = "3.1.0"
 simple_logger = "5.0.0"
 size = "0.5.0"
 ssh2 = "0.9.4"
-ssh2-config = "0.4.0"
+ssh2-config = "0.5.0"
 tabled = "0.20.0"
 whoami = "1.5.1"
 
