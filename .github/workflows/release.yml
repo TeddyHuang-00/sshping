@@ -36,7 +36,7 @@ jobs:
             feature: default
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install Cross-Compilation Tools
         if: contains(matrix.target, 'linux-musl')
@@ -96,7 +96,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Update CHANGELOG
         id: changelog
