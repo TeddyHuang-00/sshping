@@ -12,7 +12,7 @@ use tabled::{settings::Style, Table};
 use whoami::username;
 
 #[allow(clippy::upper_case_acronyms)]
-#[derive(ValueEnum, Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, ValueEnum)]
 pub enum TableStyle {
     Empty,
     Blank,
@@ -50,7 +50,7 @@ impl TableStyle {
 }
 
 // Define options struct
-#[derive(Parser, Debug)]
+#[derive(Debug, Parser)]
 #[command(name = crate_name!())]
 #[command(version = crate_version!())]
 #[command(about = crate_description!())]
@@ -260,7 +260,7 @@ pub struct Options {
     pub verbose: u8,
 }
 
-#[derive(ValueEnum, Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, ValueEnum)]
 pub enum Test {
     /// Run echo test
     Echo,
@@ -277,7 +277,7 @@ pub struct Target {
     pub port: u16,
 }
 
-#[derive(ValueEnum, Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, ValueEnum)]
 pub enum Format {
     /// Table in console
     Table,

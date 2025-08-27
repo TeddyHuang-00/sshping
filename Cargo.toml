@@ -6,6 +6,10 @@ description = "SSH-based ping that measures interactive character echo latency a
 authors = ["Nan Huang <teddyhuangnan@gmail.com>"]
 license = "MIT"
 
+[features]
+default = []
+include-openssl = ["ssh2/vendored-openssl"]
+
 [dependencies]
 bytesize = "2.0.0"
 clap = { version = "4.5.7", features = [
@@ -47,7 +51,3 @@ serde_json = "1.0.138"
 shellexpand = "3.1.0"
 tabled = "0.20.0"
 whoami = "1.5.1"
-
-[features]
-default = []
-include-openssl = ["ssh2/vendored-openssl"]

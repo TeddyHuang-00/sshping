@@ -5,7 +5,7 @@ use tabled::Tabled;
 
 use crate::util::Formatter;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct EchoTestSummary {
     pub char_sent: usize,
     pub avg_latency: String,
@@ -60,7 +60,7 @@ impl EchoTestSummary {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct SpeedTestResult {
     pub size: String,
     pub time: String,
@@ -77,7 +77,7 @@ impl SpeedTestResult {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct SpeedTestSummary {
     pub upload: SpeedTestResult,
     pub download: SpeedTestResult,
