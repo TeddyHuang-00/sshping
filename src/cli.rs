@@ -1,3 +1,4 @@
+use std::fmt;
 use std::path::PathBuf;
 
 use bytesize::ByteSize;
@@ -156,7 +157,7 @@ pub struct Options {
         short,
         long,
         value_name = "CMD",
-        default_value = "cat > /dev/null",
+        default_value = "cat",
         value_hint = ValueHint::CommandString
     )]
     pub echo_cmd: String,
@@ -275,6 +276,12 @@ pub struct Target {
     pub user: String,
     pub host: String,
     pub port: u16,
+}
+
+impl fmt::Display for Target {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ssh://{}@{}:{}", self.user, self.host, self.port)
+    }
 }
 
 #[derive(ValueEnum, Clone, PartialEq, Eq, Debug)]
