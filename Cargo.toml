@@ -9,11 +9,11 @@ license = "MIT"
 [dependencies]
 bytesize = "2.0.0"
 clap = { version = "4.5.7", features = [
-  "derive",
-  "string",
-  "cargo",
-  "color",
-  "wrap_help",
+    "derive",
+    "string",
+    "cargo",
+    "color",
+    "wrap_help",
 ] }
 humantime = "2.1.0"
 indicatif = "0.18.0"
@@ -26,19 +26,21 @@ serde_json = "1.0.138"
 shellexpand = "3.1.0"
 simple_logger = "5.0.0"
 size = "0.5.0"
-ssh2 = "0.9.4"
-ssh2-config = "0.6.0"
+openssh = "0.11.5"
 tabled = "0.20.0"
 whoami = "1.5.1"
+tokio = { version = "1.47.1", features = ["full"] }
+openssh-sftp-client = { version = "0.15.3", features = ["openssh"] }
+bytes = "1.10.1"
 
 [build-dependencies]
 bytesize = "2.0.0"
 clap = { version = "4.5.7", features = [
-  "derive",
-  "string",
-  "cargo",
-  "color",
-  "wrap_help",
+    "derive",
+    "string",
+    "cargo",
+    "color",
+    "wrap_help",
 ] }
 clap_complete = "4.5.44"
 regex = "1.11.1"
@@ -50,4 +52,3 @@ whoami = "1.5.1"
 
 [features]
 default = []
-include-openssl = ["ssh2/vendored-openssl"]

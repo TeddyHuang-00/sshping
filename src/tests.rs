@@ -1,16 +1,19 @@
 use std::{
-    io::{Read, Write},
     path::{Path, PathBuf},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
+use bytes::BytesMut;
 use indicatif::{ProgressBar, ProgressState, ProgressStyle};
 use log::{debug, info, log_enabled, trace, warn, Level};
+use openssh::{Session, Stdio};
+use openssh_sftp_client::{Sftp, SftpOptions};
 use rand::{
     distr::{Distribution, Uniform},
     rng,
 };
-use ssh2::Session;
+use tokio::io::{AsyncReadExt, AsyncWriteExt as _};
 
 use crate::{
     summary::{EchoTestSummary, SpeedTestResult, SpeedTestSummary},
@@ -32,7 +35,7 @@ fn get_progress_bar_style(test_name: &str) -> ProgressStyle {
         .progress_chars("#>-")
 }
 
-pub fn run_echo_test(
+pub async fn run_echo_test(
     session: &Session,
     echo_cmd: &str,
     char_count: usize,
@@ -45,27 +48,22 @@ pub fn run_echo_test(
     debug!("Time limit for echo: {time_limit:?} seconds");
     // Start the channel server
     trace!("Preparing channel session");
-    let mut channel = session.channel_session().map_err(|e| e.to_string())?;
-    // Request a pseudo-terminal for the interactive shell
-    channel
-        .request_pty("sshping", None, Some((10, 5, 0, 0)))
-        .map_err(|e| e.to_string())?;
-    channel.shell().map_err(|e| e.to_string())?;
     // Send the echo command to accept input
+    let mut cmd = session.raw_command(echo_cmd);
     trace!("Starting echo command");
-    let echo_cmd = format!("{echo_cmd}\n");
-    channel
-        .write_all(echo_cmd.as_bytes())
-        .map_err(|e| e.to_string())?;
-    channel.flush().map_err(|e| e.to_string())?;
-    // Read the initial buffer to clear the echo command
-    let mut buffer = [0; 1500];
-    channel.read(&mut buffer).map_err(|e| e.to_string())?;
+    let mut running = cmd
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .await
+        .map_err(|err| format!("Starting {echo_cmd}: {err}"))?;
 
     // Prepare the echo test
     trace!("Testing echo latency");
+    let mut stdout = running.stdout().take().expect("we set a piped stdout");
+    let mut stdin = running.stdin().take().expect("we set a piped stdin");
     let write_buffer = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    let mut read_buffer = [0; 1];
+    let mut read_buffer = Vec::with_capacity(1);
     let mut latencies = Vec::with_capacity(char_count);
     let timeout = time_limit.map(Duration::from_secs_f64);
     let start_time = Instant::now();
@@ -74,11 +72,13 @@ pub fn run_echo_test(
 
     for (n, idx) in (0..char_count).zip((0..write_buffer.len()).cycle()) {
         let start = Instant::now();
-        channel
+        stdin
             .write_all(&write_buffer[idx..idx + 1])
+            .await
             .map_err(|e| e.to_string())?;
-        channel
+        stdout
             .read_exact(&mut read_buffer)
+            .await
             .map_err(|e| e.to_string())?;
         let latency = start.elapsed().as_nanos();
         latencies.push(latency);
@@ -142,8 +142,8 @@ pub fn run_echo_test(
     Ok(result)
 }
 
-fn run_upload_test(
-    session: &Session,
+async fn run_upload_test(
+    session: Arc<Session>,
     size: u64,
     chunk_size: u64,
     remote_file: &Path,
@@ -151,11 +151,14 @@ fn run_upload_test(
 ) -> Result<SpeedTestResult, String> {
     info!("Running upload speed test");
     // Prepare the upload test
-    trace!("Establishing SCP channel");
-    let mut channel = session
-        .scp_send(remote_file, 0o644, size, None)
-        .map_err(|e| e.to_string())?;
-    // Generate random data to upload
+    trace!("Establishing SFTP channel");
+    let sftp = Sftp::from_clonable_session(session, SftpOptions::new())
+        .await
+        .map_err(|e| format!("could not open sftp subsystem: {e}"))?;
+    let mut channel = sftp
+        .create(remote_file)
+        .await
+        .map_err(|e| format!("could not create remote file {remote_file:?}: {e}"))?;
     trace!("Generating random data");
     let dist = Uniform::try_from(0..128_u8).unwrap();
     let buffer = dist
@@ -172,13 +175,13 @@ fn run_upload_test(
     // Starting uploading file
     trace!("Sending file in chunks");
     for chunk in buffer.as_bytes().chunks(chunk_size as usize) {
-        channel.write_all(chunk).map_err(|e| e.to_string())?;
+        channel.write_all(chunk).await.map_err(|e| e.to_string())?;
         total_bytes_sent += chunk.len();
         progress_bar.set_position(total_bytes_sent as u64);
     }
     progress_bar.finish_and_clear();
     // Clean up the channel
-    channel.send_eof().map_err(|e| e.to_string())?;
+    channel.close().await.map_err(|e| e.to_string())?;
 
     let result = SpeedTestResult::new(total_bytes_sent as u64, start_time.elapsed(), formatter);
     info!(
@@ -189,23 +192,33 @@ fn run_upload_test(
     Ok(result)
 }
 
-fn run_download_test(
-    session: &Session,
+async fn run_download_test(
+    session: Arc<Session>,
     chunk_size: u64,
     remote_file: &Path,
     formatter: &Formatter,
 ) -> Result<SpeedTestResult, String> {
     info!("Running download speed test");
     // Prepare the upload test
-    trace!("Establishing SCP channel");
-    let (mut channel, stat) = session.scp_recv(remote_file).map_err(|e| e.to_string())?;
-    let size = stat.size();
+    trace!("Establishing SFTP channel");
+    let sftp = Sftp::from_clonable_session(session, SftpOptions::new())
+        .await
+        .map_err(|e| format!("could not open sftp subsystem: {e}"))?;
+    let mut channel = sftp
+        .open(remote_file)
+        .await
+        .map_err(|e| format!("could not create remote file {remote_file:?}: {e}"))?;
+    let size = channel
+        .metadata()
+        .await
+        .map_err(|e| format!("could not query remote size: {e}"))?
+        .len()
+        .unwrap_or(0);
     if size == 0 {
         return Err("Remote file is empty".to_string());
     }
     // Prepare buffer for downloading
     trace!("Preparing buffer for downloading");
-    let mut buffer = vec![0; chunk_size as usize];
     // Preparing logging variables
     let mut total_bytes_recv = 0;
     let start_time: Instant = Instant::now();
@@ -215,19 +228,32 @@ fn run_download_test(
     // Starting downloading file
     trace!("Receiving file in chunks");
     while size - total_bytes_recv > chunk_size {
-        channel.read_exact(&mut buffer).map_err(|e| e.to_string())?;
-        total_bytes_recv += chunk_size;
+        let buffer = BytesMut::zeroed(chunk_size as usize);
+        let actual = channel
+            .read_all(chunk_size as usize, buffer)
+            .await
+            .map_err(|e| e.to_string())?;
+        let received = actual.len();
+        total_bytes_recv += received as u64;
         progress_bar.set_position(total_bytes_recv);
+        if received == 0 {
+            debug!("Reached end of file");
+            break;
+        }
     }
     if size - total_bytes_recv > 0 {
+        let buffer = BytesMut::zeroed(chunk_size as usize);
         total_bytes_recv += channel
-            .read_to_end(&mut buffer)
-            .map_err(|e| e.to_string())? as u64;
+            .read(chunk_size as u32, buffer)
+            .await
+            .map_err(|e| e.to_string())?
+            .map(|bm| bm.len())
+            .unwrap_or(0) as u64;
         progress_bar.set_position(total_bytes_recv);
     }
     progress_bar.finish_and_clear();
     // Clean up the channel
-    channel.send_eof().map_err(|e| e.to_string())?;
+    channel.close().await.map_err(|e| e.to_string())?;
 
     let result = SpeedTestResult::new(total_bytes_recv, start_time.elapsed(), formatter);
     info!(
@@ -238,8 +264,8 @@ fn run_download_test(
     Ok(result)
 }
 
-pub fn run_speed_test(
-    session: &Session,
+pub async fn run_speed_test(
+    session: Arc<Session>,
     size: u64,
     chunk_size: u64,
     remote_file: &PathBuf,
@@ -252,8 +278,10 @@ pub fn run_speed_test(
     );
     debug!("Remote file path: {remote_file:?}");
 
-    let upload_result = run_upload_test(session, size, chunk_size, remote_file, formatter)?;
-    let download_result = run_download_test(session, chunk_size, remote_file, formatter)?;
+    let upload_result =
+        run_upload_test(session.clone(), size, chunk_size, remote_file, formatter).await?;
+    let download_result =
+        run_download_test(session.clone(), chunk_size, remote_file, formatter).await?;
     Ok(SpeedTestSummary {
         upload: upload_result,
         download: download_result,
