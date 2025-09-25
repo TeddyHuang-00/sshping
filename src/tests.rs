@@ -60,8 +60,11 @@ pub async fn run_echo_test(
 
     // Prepare the echo test
     trace!("Testing echo latency");
-    let mut stdout = running.stdout().take().expect("we set a piped stdout");
-    let mut stdin = running.stdin().take().expect("we set a piped stdin");
+    let mut stdout = running
+        .stdout()
+        .take()
+        .expect("Failed to get a piped stdout");
+    let mut stdin = running.stdin().take().expect("Failed to get a piped stdin");
     let write_buffer = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
     let mut read_buffer = Vec::with_capacity(1);
     let mut latencies = Vec::with_capacity(char_count);

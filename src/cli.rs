@@ -1,5 +1,4 @@
-use std::fmt;
-use std::path::PathBuf;
+use std::{fmt, path::PathBuf};
 
 use bytesize::ByteSize;
 use clap::{
