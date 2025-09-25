@@ -225,7 +225,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.60.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -945,9 +945,9 @@ dependencies = [
 
 [[package]]
 name = "ssh2-config"
-version = "0.6.0"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68555eda3e0678ceb573e60be349cc7a2df7332dcc6a56791af404a361392186"
+checksum = "bc7aae258493fa8ea06796b133b9076f3002c46cd1a4085ddd6df7236fee7034"
 dependencies = [
  "anyhow",
  "bitflags",
