@@ -18,22 +18,16 @@ jobs:
         include:
           - target: x86_64-unknown-linux-musl
             os: ubuntu-24.04
-            feature: include-openssl
           - target: aarch64-unknown-linux-musl
             os: ubuntu-24.04-arm
-            feature: include-openssl
           - target: x86_64-apple-darwin
             os: macos-13
-            feature: default
           - target: aarch64-apple-darwin
             os: macos-latest
-            feature: default
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            feature: default
           - target: aarch64-pc-windows-msvc
             os: windows-11-arm
-            feature: default
 
     steps:
       - uses: actions/checkout@v5
@@ -49,7 +43,7 @@ jobs:
           target: ${{ matrix.target }}
 
       - name: Run Build
-        run: cargo build --locked --release --target ${{ matrix.target }} -F ${{ matrix.feature }}
+        run: cargo build --locked --release --target ${{ matrix.target }}
 
       - name: Setup python for checksums
         uses: actions/setup-python@v6
