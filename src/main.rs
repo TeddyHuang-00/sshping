@@ -5,8 +5,7 @@ mod tests;
 mod util;
 
 use std::{
-    fs::File,
-    io::{BufReader, Read},
+    io::Read,
     process::ExitCode,
     sync::Arc,
 };
@@ -16,8 +15,8 @@ use clap::Parser;
 use cli::{Options, Test};
 use log::{debug, error, trace, LevelFilter};
 use russh::client;
+use russh_config;
 use simple_logger::SimpleLogger;
-use ssh2_config::{ParseRule, SshConfig};
 use summary::Record;
 use tabled::{
     settings::{themes::BorderCorrection, Alignment, Span},
@@ -63,58 +62,74 @@ async fn main() -> ExitCode {
     // Get the formatter for output
     let formatter = Formatter::new(opts.human_readable, opts.delimiter);
 
-    // Respect the SSH configuration file if it exists
-    if opts.config.exists() {
+    // Parse SSH configuration using russh-config
+    let ssh_config = if opts.config.exists() {
         debug!("SSH Config: {:?}", opts.config);
-        let mut reader =
-            BufReader::new(File::open(&opts.config).expect("Could not open configuration file"));
-        let config = SshConfig::default()
-            .parse(&mut reader, ParseRule::ALLOW_UNKNOWN_FIELDS)
-            .expect("Failed to parse configuration");
-        // Query attributes for host
-        let params = config.query(opts.target.host.as_str());
-        // Update options with configuration
-        if let Some(host) = params.host_name {
-            opts.target.host = host;
+        match russh_config::parse_path(&opts.config, &opts.target.host) {
+            Ok(config) => Some(config),
+            Err(e) => {
+                debug!("Failed to parse SSH config: {e}, using defaults");
+                None
+            }
         }
-        if let Some(user) = params.user {
-            opts.target.user = user;
-        }
-        if let Some(port) = params.port {
-            opts.target.port = port;
-        }
-        if let Some(identity) = params.identity_file {
-            opts.identity = Some(identity[0].to_owned());
-        }
-    }
+    } else {
+        debug!("SSH config file does not exist, using defaults");
+        None
+    };
 
     trace!("Options: {:?}", opts);
     debug!("User: {}", opts.target.user);
     debug!("Host: {}", opts.target.host);
     debug!("Port: {}", opts.target.port);
 
-    // Connect to the SSH server
-    let config = Arc::new(client::Config {
+    // Connect to the SSH server using russh-config's stream when available
+    let client_config = Arc::new(client::Config {
         inactivity_timeout: Some(std::time::Duration::from_secs_f64(opts.ssh_timeout)),
         ..Default::default()
     });
     let handler = SshHandler;
 
-    let addr = (opts.target.host.as_str(), opts.target.port);
-    let mut session = match tokio::time::timeout(
-        std::time::Duration::from_secs_f64(opts.ssh_timeout),
-        client::connect(config, addr, handler),
-    )
-    .await
-    {
-        Ok(Ok(session)) => session,
-        Ok(Err(e)) => {
-            error!("Failed to connect to server: {e}");
-            return ExitCode::FAILURE;
+    let mut session = if let Some(config) = ssh_config {
+        // Use russh-config to get the stream (handles ProxyCommand if configured)
+        match tokio::time::timeout(
+            std::time::Duration::from_secs_f64(opts.ssh_timeout),
+            async {
+                let stream = config.stream().await.map_err(|e| {
+                    russh::Error::from(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
+                })?;
+                client::connect_stream(client_config, stream, handler).await
+            },
+        )
+        .await
+        {
+            Ok(Ok(session)) => session,
+            Ok(Err(e)) => {
+                error!("Failed to connect to server: {e}");
+                return ExitCode::FAILURE;
+            }
+            Err(_) => {
+                error!("Connection timeout");
+                return ExitCode::FAILURE;
+            }
         }
-        Err(_) => {
-            error!("Connection timeout");
-            return ExitCode::FAILURE;
+    } else {
+        // Fallback to direct connection when config is not available
+        let addr = (opts.target.host.as_str(), opts.target.port);
+        match tokio::time::timeout(
+            std::time::Duration::from_secs_f64(opts.ssh_timeout),
+            client::connect(client_config, addr, handler),
+        )
+        .await
+        {
+            Ok(Ok(session)) => session,
+            Ok(Err(e)) => {
+                error!("Failed to connect to server: {e}");
+                return ExitCode::FAILURE;
+            }
+            Err(_) => {
+                error!("Connection timeout");
+                return ExitCode::FAILURE;
+            }
         }
     };
 
