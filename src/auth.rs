@@ -14,15 +14,24 @@ async fn authenticate_publickey<H: client::Handler>(
     session: &mut client::Handle<H>,
     user: &str,
     identity: &PathBuf,
+    password: Option<&str>,
     timeout: f64,
 ) -> Result<(), String> {
     let key_content = std::fs::read_to_string(identity)
         .map_err(|e| format!("Failed to read identity file: {e}"))?;
-    let key = decode_secret_key(&key_content, None)
+    let key = decode_secret_key(&key_content, password)
         .map_err(|e| format!("Failed to decode secret key: {e}"))?;
+    
+    // Get the best supported RSA hash algorithm for the connection
+    let rsa_hash = session
+        .best_supported_rsa_hash()
+        .await
+        .map_err(|e| format!("Failed to get RSA hash algorithm: {e}"))?
+        .flatten();
+    
     let timeout_result = tokio::time::timeout(
         Duration::from_secs_f64(timeout),
-        session.authenticate_publickey(user, PrivateKeyWithHashAlg::new(Arc::new(key), None)),
+        session.authenticate_publickey(user, PrivateKeyWithHashAlg::new(Arc::new(key), rsa_hash)),
     )
     .await
     .map_err(|_| format!("Public key authentication timed out after {timeout} seconds"))?;
@@ -68,7 +77,7 @@ pub async fn authenticate_all<H: client::Handler>(
 
     // Try public key authentication if identity file is provided
     if let Some(identity_path) = identity
-        && authenticate_publickey(session, user, identity_path, timeout)
+        && authenticate_publickey(session, user, identity_path, password, timeout)
             .await
             .inspect_err(|e| warn!("{e}"))
             .is_ok()
