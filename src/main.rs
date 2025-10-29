@@ -7,16 +7,16 @@ mod util;
 use std::{
     fs::File,
     io::{BufReader, Read},
-    net::TcpStream,
     process::ExitCode,
+    sync::Arc,
 };
 
 use auth::authenticate_all;
 use clap::Parser;
 use cli::{Options, Test};
 use log::{debug, error, trace, LevelFilter};
+use russh::client;
 use simple_logger::SimpleLogger;
-use ssh2::Session;
 use ssh2_config::{ParseRule, SshConfig};
 use summary::Record;
 use tabled::{
@@ -26,7 +26,21 @@ use tabled::{
 use tests::{run_echo_test, run_speed_test};
 use util::Formatter;
 
-fn main() -> ExitCode {
+struct SshHandler;
+
+impl client::Handler for SshHandler {
+    type Error = russh::Error;
+
+    async fn check_server_key(
+        &mut self,
+        _server_public_key: &russh::keys::ssh_key::PublicKey,
+    ) -> Result<bool, Self::Error> {
+        Ok(true)
+    }
+}
+
+#[tokio::main]
+async fn main() -> ExitCode {
     let mut opts = Options::parse();
 
     // Initialize logging
@@ -79,59 +93,62 @@ fn main() -> ExitCode {
     debug!("Host: {}", opts.target.host);
     debug!("Port: {}", opts.target.port);
 
-    // Connect to the local SSH server
-    let tcp = match TcpStream::connect(format!("{}:{}", opts.target.host, opts.target.port)) {
-        Ok(tcp) => tcp,
-        Err(e) => {
+    // Connect to the SSH server
+    let config = Arc::new(client::Config {
+        inactivity_timeout: Some(std::time::Duration::from_secs_f64(opts.ssh_timeout)),
+        ..Default::default()
+    });
+    let handler = SshHandler;
+    
+    let addr = (opts.target.host.as_str(), opts.target.port);
+    let mut session = match tokio::time::timeout(
+        std::time::Duration::from_secs_f64(opts.ssh_timeout),
+        client::connect(config, addr, handler),
+    )
+    .await
+    {
+        Ok(Ok(session)) => session,
+        Ok(Err(e)) => {
             error!("Failed to connect to server: {e}");
             return ExitCode::FAILURE;
         }
-    };
-    let mut session = match Session::new() {
-        Ok(session) => session,
-        Err(e) => {
-            error!("Failed to create session: {e}");
+        Err(_) => {
+            error!("Connection timeout");
             return ExitCode::FAILURE;
         }
     };
-    session.set_timeout((opts.ssh_timeout * 1000.0) as u32);
-    session.set_tcp_stream(tcp);
-    match session.handshake() {
-        Ok(_) => {}
-        Err(e) => {
-            error!("Failed to handshake: {e}");
-            return ExitCode::FAILURE;
-        }
-    }
 
     // Try to authenticate with the server using:
     // 1) identity in the agent;
     // 2) specified identity;
     // 3) password
     let ssh_connect_time = match authenticate_all(
-        &session,
+        &mut session,
         &opts.target.user,
         opts.password.as_deref(),
         opts.identity.as_ref(),
-    ) {
+        opts.ssh_timeout,
+    )
+    .await
+    {
         Ok(time) => time,
         Err(e) => {
             error!("Exiting due to authenticate: {e}");
             return ExitCode::FAILURE;
         }
     };
-    // Make sure we succeeded
-    assert!(session.authenticated());
 
     // Running tests
     let echo_test_result = if opts.run_tests == Test::Echo || opts.run_tests == Test::Both {
         match run_echo_test(
-            &session,
+            &mut session,
             &opts.echo_cmd,
             opts.char_count,
             opts.echo_timeout,
             &formatter,
-        ) {
+        )
+        .await
+        {
             Ok(result) => Some(result),
             Err(e) => {
                 error!("Failed to finish echo test: {e}");
@@ -143,12 +160,14 @@ fn main() -> ExitCode {
     };
     let speed_test_result = if opts.run_tests == Test::Speed || opts.run_tests == Test::Both {
         match run_speed_test(
-            &session,
+            &mut session,
             opts.size,
             opts.chunk_size,
             &opts.remote_file,
             &formatter,
-        ) {
+        )
+        .await
+        {
             Ok(result) => Some(result),
             Err(e) => {
                 error!("Failed to finish speed test: {e}");
