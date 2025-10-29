@@ -20,12 +20,6 @@ SSH-based ping that measures interactive character echo latency and file transfe
 cargo install sshping
 ```
 
-You can also opt in to the `include-openssl` feature to bundle OpenSSL with the binary, for rare cases where the system OpenSSL is not available:
-
-```sh
-cargo install sshping -F include-openssl
-```
-
 ### Homebrew (macOS/Linux)
 
 `sshping` is also available on Homebrew/Linuxbrew, you can install it with:
@@ -37,8 +31,6 @@ brew install TeddyHuang-00/app/sshping
 ### Pre-built binaries
 
 Pre-built binaries are available on the [releases page](https://github.com/TeddyHuang-00/sshping/releases). You can download the binary for your platform and put it in your `$PATH`.
-
-Note that all pre-built binaries are built with the `include-openssl` feature enabled, so they are self-contained and do not require OpenSSL to be installed on the system.
 
 ### From source
 
@@ -57,12 +49,6 @@ Then build and install it with cargo:
 
 ```sh
 cargo install --path .
-```
-
-As with the `include-openssl` feature, you can also enable it when installing from source:
-
-```sh
-cargo install --path . -F include-openssl
 ```
 
 ## Usage
@@ -195,14 +181,13 @@ Currently, there are a few things that can be added but haven't been yet. If you
 
 ### How to use public-private key pair for authentication?
 
-Using public-private key pair is recommended, you can either provide the identity file (private key) path through `-i` argument or use agent authentication by adding the identity file to your ssh agent:
+Using public-private key pair is recommended. Provide the identity file (private key) path through the `-i` argument:
 
 ```sh
-# Start SSH agent if you haven't already
-eval `ssh-agent -s`
-# Add identity to agent (assuming it is `~/.ssh/id_rsa`)
-ssh-add ~/.ssh/id_rsa
+sshping user@host -i ~/.ssh/id_rsa
 ```
+
+Note: SSH agent authentication is not currently supported. Support may be added in future releases as the underlying russh library evolves.
 
 ### Why isn't XXX functionality of SSH supported?
 

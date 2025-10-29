@@ -1,7 +1,7 @@
 [package]
 name = "sshping"
 version = "0.2.2"
-edition = "2021"
+edition = "2024"
 description = "SSH-based ping that measures interactive character echo latency and file transfer throughput. Pronounced \"shipping\"."
 authors = ["Nan Huang <teddyhuangnan@gmail.com>"]
 license = "MIT"
@@ -9,7 +9,7 @@ repository = "https://github.com/TeddyHuang-00/sshping"
 
 [features]
 default = []
-include-openssl = ["ssh2/vendored-openssl"]
+include-openssl = []
 
 [dependencies]
 bytesize = "2.0.0"
@@ -26,14 +26,16 @@ log = "0.4.21"
 num-format = "0.4.4"
 rand = "0.9.0"
 regex = "1.11.1"
+russh = "0.54.6"
+russh-sftp = "2.1.1"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.138"
 shellexpand = "3.1.0"
 simple_logger = "5.0.0"
 size = "0.5.0"
-ssh2 = "0.9.4"
 ssh2-config = "0.6.0"
 tabled = "0.20.0"
+tokio = { version = "1.42.0", features = ["full"] }
 whoami = "1.5.1"
 
 [build-dependencies]
