@@ -187,7 +187,7 @@ Using public-private key pair is recommended. Provide the identity file (private
 sshping user@host -i ~/.ssh/id_rsa
 ```
 
-Note: SSH agent authentication is currently not supported in this version.
+Note: SSH agent authentication is not currently supported. Support may be added in future releases as the underlying russh library evolves.
 
 ### Why isn't XXX functionality of SSH supported?
 
