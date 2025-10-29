@@ -4,18 +4,13 @@ mod summary;
 mod tests;
 mod util;
 
-use std::{
-    io::Read,
-    process::ExitCode,
-    sync::Arc,
-};
+use std::{io::Read, process::ExitCode, sync::Arc};
 
 use auth::authenticate_all;
 use clap::Parser;
 use cli::{Options, Test};
 use log::{debug, error, trace, LevelFilter};
 use russh::client;
-use russh_config;
 use simple_logger::SimpleLogger;
 use summary::Record;
 use tabled::{
@@ -40,7 +35,7 @@ impl client::Handler for SshHandler {
 
 #[tokio::main]
 async fn main() -> ExitCode {
-    let mut opts = Options::parse();
+    let opts = Options::parse();
 
     // Initialize logging
     SimpleLogger::new()
@@ -94,9 +89,10 @@ async fn main() -> ExitCode {
         match tokio::time::timeout(
             std::time::Duration::from_secs_f64(opts.ssh_timeout),
             async {
-                let stream = config.stream().await.map_err(|e| {
-                    russh::Error::from(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
-                })?;
+                let stream = config
+                    .stream()
+                    .await
+                    .map_err(|e| russh::Error::from(std::io::Error::other(e.to_string())))?;
                 client::connect_stream(client_config, stream, handler).await
             },
         )

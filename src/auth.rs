@@ -21,14 +21,14 @@ async fn authenticate_publickey<H: client::Handler>(
         .map_err(|e| format!("Failed to read identity file: {e}"))?;
     let key = decode_secret_key(&key_content, password)
         .map_err(|e| format!("Failed to decode secret key: {e}"))?;
-    
+
     // Get the best supported RSA hash algorithm for the connection
     let rsa_hash = session
         .best_supported_rsa_hash()
         .await
         .map_err(|e| format!("Failed to get RSA hash algorithm: {e}"))?
         .flatten();
-    
+
     let timeout_result = tokio::time::timeout(
         Duration::from_secs_f64(timeout),
         session.authenticate_publickey(user, PrivateKeyWithHashAlg::new(Arc::new(key), rsa_hash)),
