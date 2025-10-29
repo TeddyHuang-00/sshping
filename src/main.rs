@@ -99,7 +99,7 @@ async fn main() -> ExitCode {
         ..Default::default()
     });
     let handler = SshHandler;
-    
+
     let addr = (opts.target.host.as_str(), opts.target.port);
     let mut session = match tokio::time::timeout(
         std::time::Duration::from_secs_f64(opts.ssh_timeout),
