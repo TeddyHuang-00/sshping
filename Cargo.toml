@@ -7,10 +7,6 @@ authors = ["Nan Huang <teddyhuangnan@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/TeddyHuang-00/sshping"
 
-[features]
-default = []
-include-openssl = []
-
 [dependencies]
 bytesize = "2.0.0"
 clap = { version = "4.5.7", features = [

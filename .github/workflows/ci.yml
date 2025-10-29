@@ -14,7 +14,7 @@ on:
 
 jobs:
   test-build:
-    name: test ${{ matrix.target }}(${{ matrix.feature }})
+    name: test ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write
@@ -24,22 +24,16 @@ jobs:
         include:
           - target: x86_64-unknown-linux-musl
             os: ubuntu-24.04
-            feature: include-openssl
           - target: aarch64-unknown-linux-musl
             os: ubuntu-24.04-arm
-            feature: include-openssl
           - target: x86_64-apple-darwin
             os: macos-13
-            feature: default
           - target: aarch64-apple-darwin
             os: macos-latest
-            feature: default
           - target: x86_64-pc-windows-msvc
             os: windows-latest
-            feature: default
           - target: aarch64-pc-windows-msvc
             os: windows-11-arm
-            feature: default
 
     steps:
       - uses: actions/checkout@v5
@@ -55,6 +49,6 @@ jobs:
           target: ${{ matrix.target }}
 
       - name: Run Cargo
-        run: cargo build --locked --target ${{ matrix.target }} -F ${{ matrix.feature }}
+        run: cargo build --locked --target ${{ matrix.target }}
 
       # We might include unit test in the future, but we don't have any at the time
