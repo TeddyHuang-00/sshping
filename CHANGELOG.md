@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### 🚀 Features
+
+- Migrate from ssh2 to russh for SSH operations
+  - Replace ssh2 with russh (pure Rust SSH implementation)
+  - Add async/await support with tokio runtime
+  - Update all SSH operations to be asynchronous
+  - Use russh-sftp for file transfer operations
+
+### ⚠️ Breaking Changes
+
+- SSH agent authentication is no longer supported in this version
+- Minimum Rust version may have changed due to async runtime requirements
+
+### 📚 Documentation
+
+- Update FAQ to reflect removal of SSH agent authentication support
+
 ## [0.2.2] - 2025-08-27
 
 ### 🐛 Bug Fixes
