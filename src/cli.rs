@@ -64,9 +64,9 @@ pub struct Options {
 
     /// Read the ssh config file FILE for options
     ///
-    /// We get the user, host, port and identity file from ssh config
+    /// SSH config options such as ProxyCommand are supported through russh-config
     ///
-    /// NOTE: Options like bind address, proxy jump, etc. are not supported
+    /// NOTE: Some options like bind address may not be fully supported
     #[arg(
         short = 'f',
         long,
