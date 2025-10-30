@@ -187,7 +187,18 @@ Using public-private key pair is recommended. Provide the identity file (private
 sshping user@host -i ~/.ssh/id_rsa
 ```
 
+If your private key is encrypted with a passphrase, you can either:
+- Provide it via the `-p` flag: `sshping user@host -i ~/.ssh/id_rsa -p "your-passphrase"` (not recommended for security)
+- Let the tool prompt you interactively (recommended): When running in an interactive terminal, you'll be prompted to enter the passphrase securely
+
 Note: SSH agent authentication is not currently supported. Support may be added in future releases as the underlying russh library evolves.
+
+### What about password authentication?
+
+Password authentication is supported but not recommended. If no public key authentication is configured, the tool will:
+- Use the password provided via `-p` flag if available
+- Prompt you interactively for a password when running in an interactive terminal (recommended over `-p` flag)
+- Fail if neither is available or in non-interactive environments (scripts, CI/CD)
 
 ### Why isn't XXX functionality of SSH supported?
 
