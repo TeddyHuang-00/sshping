@@ -1,4 +1,5 @@
 use std::{
+    io::{self, IsTerminal},
     path::PathBuf,
     sync::Arc,
     time::{Duration, Instant},
@@ -19,8 +20,20 @@ async fn authenticate_publickey<H: client::Handler>(
 ) -> Result<(), String> {
     let key_content = std::fs::read_to_string(identity)
         .map_err(|e| format!("Failed to read identity file: {e}"))?;
-    let key = decode_secret_key(&key_content, password)
-        .map_err(|e| format!("Failed to decode secret key: {e}"))?;
+    
+    // Try to decode the key with the provided password first
+    let mut key_result = decode_secret_key(&key_content, password);
+    
+    // If decoding fails and we're in an interactive terminal, prompt for passphrase
+    if key_result.is_err() && password.is_none() && io::stdin().is_terminal() {
+        eprintln!("Enter passphrase for key '{}': ", identity.display());
+        if let Ok(passphrase) = rpassword::read_password()
+            && !passphrase.is_empty() {
+                key_result = decode_secret_key(&key_content, Some(&passphrase));
+            }
+    }
+    
+    let key = key_result.map_err(|e| format!("Failed to decode secret key: {e}"))?;
     
     // Get the best supported RSA hash algorithm for the connection
     let rsa_hash = session
@@ -85,7 +98,7 @@ pub async fn authenticate_all<H: client::Handler>(
         return Ok(start.elapsed());
     }
 
-    // Try password authentication
+    // Try password authentication with provided password
     if let Some(pwd) = password
         && authenticate_password(session, user, pwd, timeout)
             .await
@@ -93,6 +106,20 @@ pub async fn authenticate_all<H: client::Handler>(
             .is_ok()
     {
         return Ok(start.elapsed());
+    }
+
+    // If no password was provided and we're in an interactive terminal, prompt for one
+    if password.is_none() && io::stdin().is_terminal() {
+        eprintln!("{}'s password: ", user);
+        if let Ok(pwd) = rpassword::read_password()
+            && !pwd.is_empty()
+                && authenticate_password(session, user, &pwd, timeout)
+                    .await
+                    .inspect_err(|e| warn!("{e}"))
+                    .is_ok()
+            {
+                return Ok(start.elapsed());
+            }
     }
 
     // Fails if all authentication methods fail
