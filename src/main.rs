@@ -52,7 +52,10 @@ async fn execute_remote_command<H: client::Handler>(
         .map_err(|e| e.to_string())?;
 
     trace!("Executing command: {command}");
-    channel.exec(true, command).await.map_err(|e| e.to_string())?;
+    channel
+        .exec(true, command)
+        .await
+        .map_err(|e| e.to_string())?;
 
     let mut output = String::new();
     let mut stderr_output = String::new();
@@ -148,15 +151,9 @@ async fn connect_with_proxy_jump(
 
     // Authenticate with jump host
     debug!("Authenticating with jump host");
-    authenticate_all(
-        &mut jump_session,
-        &jump_user,
-        password,
-        identity,
-        timeout,
-    )
-    .await
-    .map_err(|e| format!("Failed to authenticate with jump host: {e}"))?;
+    authenticate_all(&mut jump_session, &jump_user, password, identity, timeout)
+        .await
+        .map_err(|e| format!("Failed to authenticate with jump host: {e}"))?;
 
     // If there are more jump hosts, we would need to chain them
     // For now, we support only one jump host
@@ -244,10 +241,10 @@ async fn main() -> ExitCode {
             opts.identity = Some(identity[0].to_owned());
         }
         // Read proxy_jump from SSH config if not specified on command line
-        if opts.proxy_jump.is_none() {
-            if let Some(proxy_jump) = params.proxy_jump {
-                opts.proxy_jump = Some(proxy_jump.join(","));
-            }
+        if opts.proxy_jump.is_none()
+            && let Some(proxy_jump) = params.proxy_jump
+        {
+            opts.proxy_jump = Some(proxy_jump.join(","));
         }
     }
 
