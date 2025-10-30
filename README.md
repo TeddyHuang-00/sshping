@@ -77,6 +77,8 @@ Options:
   -H, --human-readable           Use human-friendly units
   -k, --key-wait                 Wait for keyboard input before exiting
   -v, --verbose...               Show verbose output, use multiple for more noise
+  -R, --remote-command <CMD>     Execute a remote command instead of running tests
+  -J, --proxy-jump <JUMP_HOST>   Connect through one or more jump hosts
   -h, --help                     Print help (see more with '--help')
   -V, --version                  Print version
 ```
@@ -162,6 +164,32 @@ $ sshping user@host -H -o json
 }
 ```
 
+Connect through a jump host (proxy):
+
+```sh
+$ sshping target-host -J jump-host.example.com
+# Or with user and port
+$ sshping target-host -J user@jump-host.example.com:2222
+```
+
+Execute a remote command instead of running tests:
+
+```sh
+$ sshping user@host -R "uname -a"
+Linux hostname 5.15.0-1234-generic #56-Ubuntu SMP x86_64 GNU/Linux
+
+$ sshping user@host -R "df -h /"
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/sda1        98G   42G   51G  46% /
+```
+
+Combine ProxyJump with RemoteCommand:
+
+```sh
+$ sshping target-host -J jump-host -R "hostname"
+target-host
+```
+
 ## Contributing
 
 Contributions are welcome! Feel free to open an issue or a pull request. Anything from bug report to feature request to code contribution is appreciated.
@@ -202,7 +230,7 @@ Password authentication is supported but not recommended. If no public key authe
 
 ### Why isn't XXX functionality of SSH supported?
 
-Many features like `ProxyJump` and `BindAddress` are currently not supported due to the limitation of upstream libraries.
+Many SSH features are supported, including `ProxyJump` and `RemoteCommand`. However, some features like `BindAddress` are currently not supported due to the limitation of upstream libraries.
 
 If they got implemented in the upstream libraries, they will be added to this project as well. Or you can open a pull request to add them yourself!
 
