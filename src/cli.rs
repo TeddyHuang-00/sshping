@@ -71,11 +71,11 @@ pub struct Options {
         short = 'f',
         long,
         value_name = "FILE",
-        default_value = PathBuf::from("~/.ssh/config").into_os_string(),
+        default_value = "~/.ssh/config",
         value_parser = parse_local_path,
         value_hint = ValueHint::FilePath
     )]
-    pub config: PathBuf,
+    pub config: Option<PathBuf>,
 
     /// Output format
     ///
@@ -298,9 +298,10 @@ fn parse_target(s: &str) -> Result<Target, String> {
 }
 
 fn parse_local_path(s: &str) -> Result<PathBuf, String> {
-    Ok(PathBuf::from(tilde(s).to_string())
-        .canonicalize()
-        .expect("Failed to parse path"))
+    Ok(match PathBuf::from(tilde(s).to_string()) {
+        path if !path.exists() => path,
+        path => path.canonicalize().expect("Failed to parse path"),
+    })
 }
 
 fn parse_file_size(s: &str) -> Result<u64, String> {

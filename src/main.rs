@@ -64,10 +64,12 @@ async fn main() -> ExitCode {
     let formatter = Formatter::new(opts.human_readable, opts.delimiter);
 
     // Respect the SSH configuration file if it exists
-    if opts.config.exists() {
-        debug!("SSH Config: {:?}", opts.config);
+    if let Some(ssh_config) = &opts.config
+        && ssh_config.exists()
+    {
+        debug!("SSH Config: {:?}", ssh_config);
         let mut reader =
-            BufReader::new(File::open(&opts.config).expect("Could not open configuration file"));
+            BufReader::new(File::open(ssh_config).expect("Could not open configuration file"));
         let config = SshConfig::default()
             .parse(&mut reader, ParseRule::ALLOW_UNKNOWN_FIELDS)
             .expect("Failed to parse configuration");
