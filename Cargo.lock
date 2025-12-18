@@ -2564,7 +2564,7 @@ dependencies = [
 
 [[package]]
 name = "sshping"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "bytesize",
  "clap",
