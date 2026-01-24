@@ -1,5 +1,6 @@
 mod auth;
 mod cli;
+mod ssh_config_parser;
 mod summary;
 mod tests;
 mod util;
@@ -17,7 +18,7 @@ use cli::{Options, Test};
 use log::{debug, error, trace, LevelFilter};
 use russh::client;
 use simple_logger::SimpleLogger;
-use ssh2_config::{ParseRule, SshConfig};
+use ssh_config_parser::SshConfig;
 use summary::Record;
 use tabled::{
     settings::{themes::BorderCorrection, Alignment, Span},
@@ -71,7 +72,7 @@ async fn main() -> ExitCode {
         let mut reader =
             BufReader::new(File::open(ssh_config).expect("Could not open configuration file"));
         let config = SshConfig::default()
-            .parse(&mut reader, ParseRule::ALLOW_UNKNOWN_FIELDS)
+            .parse(&mut reader)
             .expect("Failed to parse configuration");
         // Query attributes for host
         let params = config.query(opts.target.host.as_str());
