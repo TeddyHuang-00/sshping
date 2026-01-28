@@ -288,7 +288,10 @@ pub enum Format {
 fn parse_target(s: &str) -> Result<Target, String> {
     let pat = Regex::new(r"^(?:([a-zA-Z0-9_.-]+)@)?([a-zA-Z0-9_.-]+)(?::(\d+))?$").unwrap();
     if let Some(cap) = pat.captures(s) {
-        let user = cap.get(1).map_or(username(), |m| m.as_str().to_string());
+        let user = cap
+            .get(1)
+            .map_or_else(username, |m| Ok(m.as_str().to_string()))
+            .map_err(|e| format!("Error: {e}"))?;
         let host = cap.get(2).unwrap().as_str().to_string();
         let port = cap.get(3).map_or(22, |m| m.as_str().parse().unwrap());
         Ok(Target { user, host, port })
