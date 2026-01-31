@@ -2703,9 +2703,9 @@ dependencies = [
 
 [[package]]
 name = "ssh2-config"
-version = "0.6.5"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "65c71663af77881cf6480940a2e1bfe4674868cab9f575c6f26f8098acb4b779"
+checksum = "52b8139953690127e92a058701bc65c0ea292c08084c6136fa052021373d739c"
 dependencies = [
  "anyhow",
  "bitflags",
