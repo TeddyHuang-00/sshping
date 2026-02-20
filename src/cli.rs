@@ -64,9 +64,9 @@ pub struct Options {
 
     /// Read the ssh config file FILE for options
     ///
-    /// We get the user, host, port and identity file from ssh config
+    /// We get the user, host, port, identity file and proxy jump from ssh config
     ///
-    /// NOTE: Options like bind address, proxy jump, etc. are not supported
+    /// NOTE: Some options like bind address are not supported
     #[arg(
         short = 'f',
         long,
@@ -258,6 +258,27 @@ pub struct Options {
     /// -vvvv: Show trace messages
     #[arg(short, long, action = ArgAction::Count)]
     pub verbose: u8,
+
+    /// Execute a remote command instead of running tests
+    ///
+    /// When specified, the given command will be executed on the remote host
+    /// instead of running the echo and speed tests.
+    ///
+    /// This is useful for integrating sshping with other tools or for
+    /// custom remote operations.
+    #[arg(short = 'R', long, value_name = "CMD", value_hint = ValueHint::CommandString)]
+    pub remote_command: Option<String>,
+
+    /// Connect through one or more jump hosts
+    ///
+    /// Format: [user@]host[:port][,[user@]host[:port],...]
+    ///
+    /// Multiple jump hosts can be specified separated by commas.
+    /// Each jump host will be connected in sequence to reach the target.
+    ///
+    /// Example: -J jump1.example.com,user@jump2.example.com:2222
+    #[arg(short = 'J', long, value_name = "JUMP_HOST", value_hint = ValueHint::Hostname)]
+    pub proxy_jump: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, ValueEnum)]
