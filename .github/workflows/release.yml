@@ -67,7 +67,7 @@ jobs:
           fi
 
       - name: Upload Release
-        uses: ncipollo/release-action@v1.20.0
+        uses: ncipollo/release-action@v1.21.0
         with:
           artifacts: "sshping-${{ matrix.target }}.*"
           allowUpdates: true
@@ -76,7 +76,7 @@ jobs:
 
       - name: Upload Shell Completion
         if: ${{ matrix.target == 'x86_64-unknown-linux-musl' }}
-        uses: ncipollo/release-action@v1.20.0
+        uses: ncipollo/release-action@v1.21.0
         with:
           artifacts: "target/${{ matrix.target }}/release/completions/*"
           allowUpdates: true
@@ -101,7 +101,7 @@ jobs:
           writeToFile: false
 
       - name: Update Release
-        uses: ncipollo/release-action@v1.20.0
+        uses: ncipollo/release-action@v1.21.0
         with:
           allowUpdates: true
           body: ${{ steps.changelog.outputs.changes }}
