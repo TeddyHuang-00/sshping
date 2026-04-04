@@ -1,4 +1,5 @@
 use std::{
+    collections::VecDeque,
     fmt,
     path::Path,
     time::{Duration, Instant},
@@ -84,65 +85,74 @@ pub async fn run_echo_test<H: client::Handler>(
         .await
         .map_err(|e| TestError::Ssh(e.to_string()))?;
 
-    // Request a pseudo-terminal for the interactive shell
+    // Start echo command in exec mode (no PTY line discipline/noise).
     channel
-        .request_pty(true, "sshping", 10, 5, 0, 0, &[])
+        .exec(false, echo_cmd)
         .await
         .map_err(|e| TestError::Ssh(e.to_string()))?;
-
-    channel
-        .request_shell(false)
-        .await
-        .map_err(|e| TestError::Ssh(e.to_string()))?;
-
-    // Send the echo command to accept input
-    trace!("Starting echo command");
-    let echo_cmd_bytes = format!("{echo_cmd}\n").into_bytes();
-    channel
-        .data(&echo_cmd_bytes[..])
-        .await
-        .map_err(|e| TestError::Ssh(e.to_string()))?;
-
-    // Read the initial buffer to clear the echo command
-    tokio::time::sleep(Duration::from_millis(100)).await;
-    while let Some(msg) = channel.wait().await {
-        match msg {
-            ChannelMsg::Data { .. } => break,
-            ChannelMsg::Eof => return Err(TestError::ChannelClosed),
-            _ => {}
-        }
-    }
 
     // Prepare the echo test
     trace!("Testing echo latency");
     let write_buffer = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let mut pending_data = VecDeque::new();
     let mut latencies = Vec::with_capacity(char_count);
-    let timeout = time_limit.map(Duration::from_secs_f64);
-    let start_time = Instant::now();
+    let deadline = time_limit.map(|limit| Instant::now() + Duration::from_secs_f64(limit));
     let progress_bar = ProgressBar::new(char_count as u64);
     progress_bar.set_style(get_progress_bar_style("Echo test"));
 
-    for (n, idx) in (0..char_count).zip((0..write_buffer.len()).cycle()) {
+    let mut discarded_mismatch = 0usize;
+    'echo_loop: for (n, &byte) in write_buffer.iter().cycle().enumerate().take(char_count) {
+        if let Some(deadline) = deadline
+            && Instant::now() >= deadline
+        {
+            break;
+        }
         let start = Instant::now();
 
         // Send one character
-        let byte_slice = &write_buffer[idx..idx + 1];
         channel
-            .data(byte_slice)
+            .data(&[byte][..])
             .await
             .map_err(|e| TestError::Ssh(e.to_string()))?;
 
         // Wait for echo back
         loop {
-            if let Some(msg) = channel.wait().await {
+            if let Some(received_byte) = pending_data.pop_front() {
+                if received_byte == byte {
+                    break;
+                }
+                discarded_mismatch += 1;
+                if discarded_mismatch == 1 || discarded_mismatch.is_multiple_of(64) {
+                    trace!(
+                        "Discarding unexpected echo byte (expected {:?}, got {:?}, discarded={discarded_mismatch})",
+                        byte as char,
+                        received_byte as char
+                    );
+                }
+                continue;
+            }
+
+            let msg = if let Some(deadline) = deadline {
+                let now = Instant::now();
+                if now >= deadline {
+                    break 'echo_loop;
+                }
+                match tokio::time::timeout(deadline - now, channel.wait()).await {
+                    Ok(msg) => msg,
+                    Err(_) => break 'echo_loop,
+                }
+            } else {
+                channel.wait().await
+            };
+
+            if let Some(msg) = msg {
                 match msg {
-                    ChannelMsg::Data { data } => {
-                        if !data.is_empty() {
-                            break;
-                        }
-                    }
-                    ChannelMsg::Eof => {
-                        return Err(TestError::ChannelClosed);
+                    ChannelMsg::Data { data } => pending_data.extend(data),
+                    ChannelMsg::Eof | ChannelMsg::Close => return Err(TestError::ChannelClosed),
+                    ChannelMsg::ExitStatus { exit_status } => {
+                        return Err(TestError::Ssh(format!(
+                            "Echo command exited unexpectedly with status {exit_status}"
+                        )));
                     }
                     _ => {}
                 }
@@ -154,11 +164,6 @@ pub async fn run_echo_test<H: client::Handler>(
         let latency = start.elapsed().as_nanos();
         latencies.push(latency);
 
-        if let Some(timeout) = timeout
-            && start_time.elapsed() > timeout
-        {
-            break;
-        }
         progress_bar.set_position((n as u64) + 1);
     }
     progress_bar.finish_and_clear();

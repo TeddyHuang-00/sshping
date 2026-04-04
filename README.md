@@ -67,7 +67,7 @@ Options:
   -T, --ssh-timeout <SECONDS>    Time limit for ssh connection in seconds [default: 10]
   -r, --run-tests <TEST>         Run TEST [default: both] [possible values: echo, speed, both]
   -c, --char-count <COUNT>       Number of characters to echo [default: 1000]
-  -e, --echo-cmd <CMD>           Use CMD for echo command [default: "cat > /dev/null"]
+  -e, --echo-cmd <CMD>           Use CMD for echo command [default: "cat"]
   -t, --echo-timeout <SECONDS>   Time limit for echo test in seconds
   -s, --size <SIZE>              File SIZE for speed test [default: 8.0MB]
   -u, --chunk-size <CHUNK_SIZE>  Chunk SIZE for splitting file in speed test [default: 1.0MB]
