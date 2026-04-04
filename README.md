@@ -75,6 +75,7 @@ Options:
   -b, --table-style <STYLE>      Table style for output [default: ascii] [possible values: empty, blank, ascii, psql, markdown, modern, sharp, extended, dots, rst, rounded, ascii-rounded, modern-rounded]
   -d, --delimiter <DELIMITER>    Specify delimiters to use (or None for not using) in big numbers [default: ,]
   -H, --human-readable           Use human-friendly units
+      --generate-completion <SHELL>  Generate completion script for shell and exit [possible values: bash, elvish, fish, powershell, zsh]
   -k, --key-wait                 Wait for keyboard input before exiting
   -v, --verbose...               Show verbose output, use multiple for more noise
   -h, --help                     Print help (see more with '--help')
@@ -220,4 +221,16 @@ If more than one identity file is given in the configuration file, only the firs
 
 ### Shell autocompletion doesn't work
 
-Make sure you have downloaded the completion script and sourced it in your shell profile, or place it in the appropriate directory for your shell.
+You can generate a script directly:
+
+```sh
+sshping --generate-completion bash
+```
+
+Or use dynamic completion through environment activation:
+
+```sh
+source <(SSHPING_COMPLETE=bash sshping)
+```
+
+Replace `bash` with `zsh`, `fish`, `elvish`, or `powershell` as needed.

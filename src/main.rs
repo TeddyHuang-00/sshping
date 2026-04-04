@@ -9,7 +9,7 @@ mod util;
 use std::{io::Read, process::ExitCode, time::Instant};
 
 use clap::{CommandFactory, Parser};
-use clap_complete::{CompleteEnv, aot::generate};
+use clap_complete::{aot::generate, CompleteEnv};
 use cli::{Options, Test};
 use client::{build_connection_plan, connect_plan};
 use log::{debug, error, trace, LevelFilter};
@@ -29,9 +29,17 @@ async fn main() -> ExitCode {
         .complete();
 
     let mut opts = Options::parse();
-    if let Some(shell) = opts.generate_completion {
+    if opts.generate_completion {
+        let shell = shell_from_env_var("SSHPING_COMPLETE")
+            .or_else(clap_complete::aot::Shell::from_env)
+            .unwrap_or(clap_complete::aot::Shell::Bash);
         let mut cmd = Options::command();
-        generate(shell, &mut cmd, "sshping".to_string(), &mut std::io::stdout());
+        generate(
+            shell,
+            &mut cmd,
+            "sshping".to_string(),
+            &mut std::io::stdout(),
+        );
         return ExitCode::SUCCESS;
     }
     if opts.target.is_none() {
@@ -198,4 +206,16 @@ async fn main() -> ExitCode {
 
     // Exit successfully
     ExitCode::SUCCESS
+}
+
+fn shell_from_env_var(var_name: &str) -> Option<clap_complete::aot::Shell> {
+    let shell = std::env::var(var_name).ok()?;
+    match shell.trim().to_ascii_lowercase().as_str() {
+        "bash" => Some(clap_complete::aot::Shell::Bash),
+        "elvish" => Some(clap_complete::aot::Shell::Elvish),
+        "fish" => Some(clap_complete::aot::Shell::Fish),
+        "powershell" => Some(clap_complete::aot::Shell::PowerShell),
+        "zsh" => Some(clap_complete::aot::Shell::Zsh),
+        _ => None,
+    }
 }

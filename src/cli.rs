@@ -6,7 +6,7 @@ use clap::{
     crate_authors, crate_description, crate_name, crate_version, ArgAction, Parser, ValueEnum,
     ValueHint,
 };
-use clap_complete::{aot::Shell, engine::ArgValueCompleter};
+use clap_complete::engine::ArgValueCompleter;
 use regex::Regex;
 use shellexpand::tilde;
 use tabled::{settings::Style, Table};
@@ -260,8 +260,8 @@ pub struct Options {
     pub human_readable: bool,
 
     /// Generate completion script for shell and exit
-    #[arg(long, value_enum, value_name = "SHELL")]
-    pub generate_completion: Option<Shell>,
+    #[arg(long)]
+    pub generate_completion: bool,
 
     /// Wait for keyboard input before exiting
     #[arg(short, long)]

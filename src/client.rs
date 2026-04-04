@@ -171,12 +171,11 @@ pub fn build_connection_plan(opts: &mut Options) -> Result<ConnectionPlan> {
         && ssh_config.exists()
     {
         debug!("SSH Config: {:?}", ssh_config);
-        let config = parse_path(ssh_config, target.host.as_str()).map_err(|e| {
-            ClientError::ConfigParse {
+        let config =
+            parse_path(ssh_config, target.host.as_str()).map_err(|e| ClientError::ConfigParse {
                 context: "configuration",
                 source: e.to_string(),
-            }
-        })?;
+            })?;
         if !config.host().is_empty() {
             target.host = config.host().to_string();
         }

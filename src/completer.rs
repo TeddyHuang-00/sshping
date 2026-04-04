@@ -53,7 +53,7 @@ fn read_ssh_hosts() -> Vec<String> {
         .lines()
         .map(str::trim)
         .filter(|line| !line.is_empty() && !line.starts_with('#'))
-        .filter_map(|line| parse_host_line(line))
+        .filter_map(parse_host_line)
         .flatten()
         .filter(|name| !name.is_empty())
         .collect()
@@ -67,7 +67,9 @@ fn parse_host_line(line: &str) -> Option<Vec<String>> {
     }
     Some(
         parts
-            .filter(|pattern| !pattern.contains('*') && !pattern.contains('?') && !pattern.starts_with('!'))
+            .filter(|pattern| {
+                !pattern.contains('*') && !pattern.contains('?') && !pattern.starts_with('!')
+            })
             .map(ToString::to_string)
             .collect(),
     )
@@ -76,4 +78,3 @@ fn parse_host_line(line: &str) -> Option<Vec<String>> {
 fn default_ssh_config() -> PathBuf {
     PathBuf::from(tilde("~/.ssh/config").to_string())
 }
-
