@@ -75,7 +75,6 @@ Options:
   -b, --table-style <STYLE>      Table style for output [default: ascii] [possible values: empty, blank, ascii, psql, markdown, modern, sharp, extended, dots, rst, rounded, ascii-rounded, modern-rounded]
   -d, --delimiter <DELIMITER>    Specify delimiters to use (or None for not using) in big numbers [default: ,]
   -H, --human-readable           Use human-friendly units
-      --generate-completion          Generate completion script for shell and exit
   -k, --key-wait                 Wait for keyboard input before exiting
   -v, --verbose...               Show verbose output, use multiple for more noise
   -h, --help                     Print help (see more with '--help')
@@ -221,16 +220,22 @@ If more than one identity file is given in the configuration file, only the firs
 
 ### Shell autocompletion doesn't work
 
-You can generate a script directly:
+`sshping` supports **two completion engines**:
 
-```sh
-sshping --generate-completion bash
-```
-
-Or use dynamic completion through environment activation:
+1. **Runtime dynamic completion (recommended)** with `clap_complete::CompleteEnv`:
 
 ```sh
 source <(SSHPING_COMPLETE=bash sshping)
 ```
 
-Replace `bash` with `zsh`, `fish`, `elvish`, or `powershell` as needed.
+This is recommended because it stays in sync with the installed binary and supports dynamic candidates (for example SSH config hosts).
+
+2. **Static completion scripts** generated at build time by `build.rs` (written under `target/<profile>/completions`).
+
+You can source those static files manually if you prefer file-based setup.
+
+For shells other than bash, replace `bash` with `zsh`, `fish`, `elvish`, or `powershell`:
+
+```sh
+source <(SSHPING_COMPLETE=zsh sshping)
+```

@@ -66,10 +66,9 @@ pub struct Options {
         value_parser = parse_target,
         value_hint = ValueHint::Hostname,
         group = "main_action",
-        required_unless_present = "generate_completion",
         add = ArgValueCompleter::new(complete_host)
     )]
-    pub target: Option<Target>,
+    pub target: Target,
 
     /// Read the ssh config file FILE for options
     ///
@@ -258,10 +257,6 @@ pub struct Options {
     /// Examples: 1.5 MB/s, 1s 259ms
     #[arg(short = 'H', long)]
     pub human_readable: bool,
-
-    /// Generate completion script for shell and exit
-    #[arg(long)]
-    pub generate_completion: bool,
 
     /// Wait for keyboard input before exiting
     #[arg(short, long)]

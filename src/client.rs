@@ -156,11 +156,7 @@ struct JumpSpec {
 }
 
 pub fn build_connection_plan(opts: &mut Options) -> Result<ConnectionPlan> {
-    let Some(target) = opts.target.as_mut() else {
-        return Err(ClientError::Route(
-            "Missing target. Provide <TARGET> unless generating completions.".to_string(),
-        ));
-    };
+    let target = &mut opts.target;
     let cli_identity = opts.identity.clone();
     let mut proxy_jump = None;
     let mut proxy_command = None;
