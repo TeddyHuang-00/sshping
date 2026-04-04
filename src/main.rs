@@ -76,10 +76,10 @@ async fn main() -> ExitCode {
     };
 
     trace!("Options: {:?}", opts);
-    let Some(target) = opts.target.as_ref() else {
-        error!("Missing target. Provide <TARGET> unless generating completions.");
-        return ExitCode::FAILURE;
-    };
+    let target = opts
+        .target
+        .as_ref()
+        .expect("target is validated before connection planning");
     debug!("User: {}", target.user);
     debug!("Host: {}", target.host);
     debug!("Port: {}", target.port);

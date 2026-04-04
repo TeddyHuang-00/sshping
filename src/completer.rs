@@ -35,7 +35,7 @@ fn split_target_prefix(current: &str) -> Option<(&str, &str)> {
         if host.contains(':') {
             return None;
         }
-        return Some((&current[..=user.len()], host));
+        return Some((&current[..user.len() + 1], host));
     }
     if current.contains(':') {
         return None;
