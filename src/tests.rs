@@ -100,7 +100,8 @@ pub async fn run_echo_test<H: client::Handler>(
     let progress_bar = ProgressBar::new(char_count as u64);
     progress_bar.set_style(get_progress_bar_style("Echo test"));
 
-    'echo_loop: for (n, idx) in (0..char_count).zip((0..write_buffer.len()).cycle()) {
+    let mut discarded_mismatch = 0usize;
+    'echo_loop: for (n, byte) in (0..char_count).zip(write_buffer.iter().copied().cycle()) {
         if let Some(deadline) = deadline
             && Instant::now() >= deadline
         {
@@ -109,9 +110,9 @@ pub async fn run_echo_test<H: client::Handler>(
         let start = Instant::now();
 
         // Send one character
-        let byte_slice = &write_buffer[idx..idx + 1];
+        let byte_slice = [byte];
         channel
-            .data(byte_slice)
+            .data(&byte_slice[..])
             .await
             .map_err(|e| TestError::Ssh(e.to_string()))?;
 
@@ -120,6 +121,14 @@ pub async fn run_echo_test<H: client::Handler>(
             if let Some(byte) = pending_data.pop_front() {
                 if byte == byte_slice[0] {
                     break;
+                }
+                discarded_mismatch += 1;
+                if discarded_mismatch == 1 || discarded_mismatch.is_multiple_of(64) {
+                    trace!(
+                        "Discarding unexpected echo byte (expected {:?}, got {:?}, discarded={discarded_mismatch})",
+                        byte_slice[0] as char,
+                        byte as char
+                    );
                 }
                 continue;
             }
@@ -139,7 +148,7 @@ pub async fn run_echo_test<H: client::Handler>(
 
             if let Some(msg) = msg {
                 match msg {
-                    ChannelMsg::Data { data } => pending_data.extend(data.as_ref().iter().copied()),
+                    ChannelMsg::Data { data } => pending_data.extend(data),
                     ChannelMsg::Eof | ChannelMsg::Close => return Err(TestError::ChannelClosed),
                     ChannelMsg::ExitStatus { exit_status } => {
                         return Err(TestError::Ssh(format!(
