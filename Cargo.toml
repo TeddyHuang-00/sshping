@@ -10,11 +10,11 @@ repository = "https://github.com/TeddyHuang-00/sshping"
 [dependencies]
 bytesize = "2.0.0"
 clap = { version = "4.5.7", features = [
-  "derive",
-  "string",
-  "cargo",
-  "color",
-  "wrap_help",
+    "derive",
+    "string",
+    "cargo",
+    "color",
+    "wrap_help",
 ] }
 humantime = "2.1.0"
 indicatif = "0.18.0"
@@ -38,11 +38,11 @@ whoami = "2.1.1"
 [build-dependencies]
 bytesize = "2.0.0"
 clap = { version = "4.5.7", features = [
-  "derive",
-  "string",
-  "cargo",
-  "color",
-  "wrap_help",
+    "derive",
+    "string",
+    "cargo",
+    "color",
+    "wrap_help",
 ] }
 clap_complete = "4.5.44"
 regex = "1.11.1"
@@ -51,3 +51,6 @@ serde_json = "1.0.138"
 shellexpand = "3.1.0"
 tabled = "0.20.0"
 whoami = "2.0.0"
+
+[lints.clippy]
+nursery = "warn"
