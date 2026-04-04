@@ -1,5 +1,5 @@
 use std::{
-    path::{Path, PathBuf},
+    path::Path,
     time::{Duration, Instant},
 };
 
@@ -111,6 +111,8 @@ pub async fn run_echo_test<H: client::Handler>(
                     }
                     _ => {}
                 }
+            } else {
+                return Err("Channel closed unexpectedly".to_string());
             }
         }
 
@@ -127,11 +129,11 @@ pub async fn run_echo_test<H: client::Handler>(
     progress_bar.finish_and_clear();
 
     // Calculate latency statistics
-    latencies.sort();
-    let result = EchoTestSummary::from_latencies(&latencies, formatter);
-    if result.char_sent == 0 {
+    if latencies.is_empty() {
         return Err("Unable to get any echos in given time".to_string());
     }
+    latencies.sort();
+    let result = EchoTestSummary::from_latencies(&latencies, formatter)?;
     if result.char_sent < 20 {
         warn!("Insufficient data points for accurate latency measurement");
     }
@@ -200,14 +202,10 @@ async fn run_upload_test<H: client::Handler>(
         .await
         .map_err(|e| e.to_string())?;
 
-    // Generate random data to upload
-    trace!("Generating random data");
+    // Generate random data to upload in streaming chunks
+    trace!("Generating random data in chunks");
+    let mut rng = rng();
     let dist = Uniform::try_from(0..128_u8).unwrap();
-    let buffer: Vec<u8> = dist
-        .sample_iter(rng())
-        .take(size as usize)
-        .map(|v| (v & 0x3f) + 32)
-        .collect();
 
     // Open remote file for writing
     let remote_path = remote_file.to_str().ok_or("Invalid remote file path")?;
@@ -221,7 +219,15 @@ async fn run_upload_test<H: client::Handler>(
 
     // Starting uploading file
     trace!("Sending file in chunks");
-    for chunk in buffer.chunks(chunk_size as usize) {
+    while total_bytes_sent < size as usize {
+        let to_send = chunk_size
+            .min((size as usize - total_bytes_sent) as u64)
+            .max(1) as usize;
+        let chunk: Vec<u8> = dist
+            .sample_iter(&mut rng)
+            .take(to_send)
+            .map(|v| (v & 0x3f) + 32)
+            .collect();
         file.write_all(chunk).await.map_err(|e| e.to_string())?;
         total_bytes_sent += chunk.len();
         progress_bar.set_position(total_bytes_sent as u64);
@@ -318,7 +324,7 @@ pub async fn run_speed_test<H: client::Handler>(
     session: &client::Handle<H>,
     size: u64,
     chunk_size: u64,
-    remote_file: &PathBuf,
+    remote_file: &Path,
     formatter: &Formatter,
 ) -> Result<SpeedTestSummary, String> {
     info!("Running speed test");

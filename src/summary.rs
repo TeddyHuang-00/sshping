@@ -16,8 +16,11 @@ pub struct EchoTestSummary {
 }
 
 impl EchoTestSummary {
-    pub fn from_latencies(latencies: &[u128], formatter: &Formatter) -> Self {
+    pub fn from_latencies(latencies: &[u128], formatter: &Formatter) -> Result<Self, String> {
         let char_sent = latencies.len();
+        if char_sent == 0 {
+            return Err("Unable to get any echos in given time".to_string());
+        }
         let avg_latency = latencies.iter().sum::<u128>() / (char_sent as u128);
         let std_latency = formatter.format_duration(Duration::from_nanos(
             ((latencies
@@ -40,14 +43,14 @@ impl EchoTestSummary {
         let max_latency = formatter.format_duration(Duration::from_nanos(
             latencies.last().unwrap().to_owned() as u64,
         ));
-        Self {
+        Ok(Self {
             char_sent,
             avg_latency,
             std_latency,
             med_latency,
             min_latency,
             max_latency,
-        }
+        })
     }
     pub fn to_formatted_frame(&self) -> Vec<Record> {
         vec![
@@ -69,10 +72,16 @@ pub struct SpeedTestResult {
 
 impl SpeedTestResult {
     pub fn new(size: u64, time: Duration, formatter: &Formatter) -> Self {
+        let time_nanos = time.as_nanos();
+        let speed = if time_nanos == 0 {
+            0
+        } else {
+            ((size as u128) * 1_000_000_000 / time_nanos) as u64
+        };
         Self {
             size: formatter.format_size(size),
             time: formatter.format_duration(time),
-            speed: formatter.format_size(((size as f64) / time.as_secs_f64()) as u64) + "/s",
+            speed: formatter.format_size(speed) + "/s",
         }
     }
 }
@@ -109,5 +118,27 @@ impl Record {
             metric,
             result,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use super::{EchoTestSummary, SpeedTestResult};
+    use crate::util::Formatter;
+
+    #[test]
+    fn echo_summary_rejects_empty_latencies() {
+        let formatter = Formatter::new(false, Some(','));
+        let result = EchoTestSummary::from_latencies(&[], &formatter);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn speed_result_handles_zero_duration() {
+        let formatter = Formatter::new(false, Some(','));
+        let result = SpeedTestResult::new(1024, Duration::from_nanos(0), &formatter);
+        assert_eq!(result.speed, "0 B/s");
     }
 }
