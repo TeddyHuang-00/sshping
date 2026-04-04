@@ -5,8 +5,7 @@ mod tests;
 mod util;
 
 use std::{
-    fs::File,
-    io::{BufReader, Read},
+    io::Read,
     process::ExitCode,
     sync::Arc,
 };
@@ -17,7 +16,7 @@ use cli::{Options, Test};
 use log::{debug, error, trace, LevelFilter};
 use russh::client;
 use simple_logger::SimpleLogger;
-use ssh2_config::{ParseRule, SshConfig};
+use russh_config::parse_path;
 use summary::Record;
 use tabled::{
     settings::{themes::BorderCorrection, Alignment, Span},
@@ -68,25 +67,21 @@ async fn main() -> ExitCode {
         && ssh_config.exists()
     {
         debug!("SSH Config: {:?}", ssh_config);
-        let mut reader =
-            BufReader::new(File::open(ssh_config).expect("Could not open configuration file"));
-        let config = SshConfig::default()
-            .parse(&mut reader, ParseRule::ALLOW_UNKNOWN_FIELDS)
+        let config = parse_path(ssh_config, opts.target.host.as_str())
             .expect("Failed to parse configuration");
-        // Query attributes for host
-        let params = config.query(opts.target.host.as_str());
+
         // Update options with configuration
-        if let Some(host) = params.host_name {
-            opts.target.host = host;
-        }
-        if let Some(user) = params.user {
+        opts.target.host = config.host().to_string();
+        if let Some(user) = config.host_config.user {
             opts.target.user = user;
         }
-        if let Some(port) = params.port {
+        if let Some(port) = config.host_config.port {
             opts.target.port = port;
         }
-        if let Some(identity) = params.identity_file {
-            opts.identity = Some(identity[0].to_owned());
+        if let Some(identity_files) = config.host_config.identity_file
+            && let Some(identity) = identity_files.first()
+        {
+            opts.identity = Some(identity.to_owned());
         }
     }
 
