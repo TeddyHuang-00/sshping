@@ -76,5 +76,5 @@ fn parse_host_line(line: &str) -> Option<Vec<String>> {
 }
 
 fn default_ssh_config() -> PathBuf {
-    PathBuf::from(tilde("~/.ssh/config").to_string())
+    PathBuf::from(tilde("~/.ssh/config").into_owned())
 }
