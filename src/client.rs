@@ -1,4 +1,9 @@
-use std::{fmt, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    fmt,
+    path::{Path, PathBuf},
+    sync::Arc,
+    time::Duration,
+};
 
 use log::debug;
 use russh::client;
@@ -81,7 +86,7 @@ impl Endpoint {
             &self.auth.user,
             &self.host,
             password,
-            self.auth.identity.as_ref(),
+            self.auth.identity.as_deref(),
             timeout,
         )
         .await
@@ -204,7 +209,7 @@ pub fn build_connection_plan(opts: &mut Options) -> Result<ConnectionPlan> {
     let route = build_route(
         proxy_jump.as_deref(),
         proxy_command.as_deref(),
-        opts.config.as_ref(),
+        opts.config.as_deref(),
         &target.auth.user,
         cli_identity.as_ref(),
     )?;
@@ -215,7 +220,7 @@ pub fn build_connection_plan(opts: &mut Options) -> Result<ConnectionPlan> {
 fn build_route(
     proxy_jump: Option<&str>,
     proxy_command: Option<&str>,
-    ssh_config: Option<&PathBuf>,
+    ssh_config: Option<&Path>,
     default_user: &str,
     cli_identity: Option<&PathBuf>,
 ) -> Result<Route> {
@@ -231,7 +236,7 @@ fn build_route(
         });
     }
     if let (Some(_), Some(cfg)) = (proxy_command, ssh_config.filter(|cfg| cfg.exists())) {
-        return Ok(Route::ProxyCommand(cfg.clone()));
+        return Ok(Route::ProxyCommand(cfg.to_path_buf()));
     }
     Ok(Route::Direct)
 }
@@ -313,7 +318,7 @@ pub fn resolve_user(
 
 fn resolve_jump_endpoint(
     spec: &JumpSpec,
-    ssh_config: Option<&PathBuf>,
+    ssh_config: Option<&Path>,
     default_user: &str,
     cli_identity: Option<&PathBuf>,
 ) -> Result<Endpoint> {

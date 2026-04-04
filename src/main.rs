@@ -39,7 +39,7 @@ async fn main() -> ExitCode {
         )
         .without_timestamps()
         .init()
-        .unwrap();
+        .unwrap_or_else(|e| eprintln!("Failed to initialize logger: {e}"));
 
     // Get the formatter for output
     let formatter = Formatter::new(opts.human_readable, opts.delimiter);
@@ -119,19 +119,17 @@ async fn main() -> ExitCode {
             let mut row_count = 1;
             if let Some(result) = echo_test_result {
                 let records = result.to_formatted_frame();
-                modifications.push((
-                    (row_count + 1, 0),
-                    Span::row(records.len().try_into().unwrap()),
-                ));
+                if let Ok(span) = records.len().try_into() {
+                    modifications.push(((row_count + 1, 0), Span::row(span)));
+                }
                 row_count += records.len();
                 data.extend(records);
             }
             if let Some(result) = speed_test_result {
                 let records = result.to_formatted_frame();
-                modifications.push((
-                    (row_count + 1, 0),
-                    Span::row(records.len().try_into().unwrap()),
-                ));
+                if let Ok(span) = records.len().try_into() {
+                    modifications.push(((row_count + 1, 0), Span::row(span)));
+                }
                 data.extend(records);
             }
             let mut table = Table::new(data);
@@ -157,7 +155,13 @@ async fn main() -> ExitCode {
             if let Some(result) = speed_test_result {
                 json["speed_test"] = serde_json::json!(result);
             }
-            println!("{}", serde_json::to_string_pretty(&json).unwrap());
+            match serde_json::to_string_pretty(&json) {
+                Ok(s) => println!("{s}"),
+                Err(e) => {
+                    error!("Failed to serialize JSON output: {e}");
+                    return ExitCode::FAILURE;
+                }
+            }
         }
     }
 
@@ -165,7 +169,10 @@ async fn main() -> ExitCode {
     if opts.key_wait {
         println!("Press enter to exit...");
         let mut buf = [0u8; 1];
-        let _ = std::io::stdin().read(&mut buf).unwrap();
+        if let Err(e) = std::io::stdin().read(&mut buf) {
+            error!("Failed to read keyboard input: {e}");
+            return ExitCode::FAILURE;
+        }
     }
 
     // Exit successfully

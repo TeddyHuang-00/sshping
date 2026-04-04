@@ -169,7 +169,7 @@ Contributions are welcome! Feel free to open an issue or a pull request. Anythin
 Currently, there are a few things that can be added but haven't been yet. If you would like to help but don't know where to start, you can check this list below:
 
 - [x] Table style customization
-- [ ] Unit test
+- [x] Unit tests
 - [ ] Man page generation
 - [x] Shell autocompletion script generation
 - [ ] Packaging for various platforms

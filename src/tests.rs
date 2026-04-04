@@ -1,4 +1,5 @@
 use std::{
+    fmt,
     path::Path,
     time::{Duration, Instant},
 };
@@ -17,6 +18,35 @@ use crate::{
     summary::{EchoTestSummary, SpeedTestResult, SpeedTestSummary},
     util::Formatter,
 };
+
+#[derive(Debug)]
+pub enum TestError {
+    Ssh(String),
+    ChannelClosed,
+    InvalidRemotePath,
+    EmptyEchoResult,
+    EmptyRemoteFile,
+}
+
+impl fmt::Display for TestError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ssh(msg) => write!(f, "{msg}"),
+            Self::ChannelClosed => write!(f, "Channel closed unexpectedly"),
+            Self::InvalidRemotePath => write!(f, "Invalid remote file path"),
+            Self::EmptyEchoResult => write!(f, "Unable to get any echos in given time"),
+            Self::EmptyRemoteFile => write!(f, "Remote file is empty"),
+        }
+    }
+}
+
+impl std::error::Error for TestError {}
+
+impl From<String> for TestError {
+    fn from(value: String) -> Self {
+        Self::Ssh(value)
+    }
+}
 
 fn get_progress_bar_style(test_name: &str) -> ProgressStyle {
     ProgressStyle::default_bar()
@@ -39,7 +69,7 @@ pub async fn run_echo_test<H: client::Handler>(
     char_count: usize,
     time_limit: Option<f64>,
     formatter: &Formatter,
-) -> Result<EchoTestSummary, String> {
+) -> Result<EchoTestSummary, TestError> {
     info!("Running echo latency test");
     debug!("Running echo test with command: {echo_cmd:?}");
     debug!("Number of characters to echo: {char_count:?}");
@@ -50,18 +80,18 @@ pub async fn run_echo_test<H: client::Handler>(
     let mut channel = session
         .channel_open_session()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| TestError::Ssh(e.to_string()))?;
 
     // Request a pseudo-terminal for the interactive shell
     channel
         .request_pty(true, "sshping", 10, 5, 0, 0, &[])
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| TestError::Ssh(e.to_string()))?;
 
     channel
         .request_shell(false)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| TestError::Ssh(e.to_string()))?;
 
     // Send the echo command to accept input
     trace!("Starting echo command");
@@ -69,14 +99,14 @@ pub async fn run_echo_test<H: client::Handler>(
     channel
         .data(&echo_cmd_bytes[..])
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| TestError::Ssh(e.to_string()))?;
 
     // Read the initial buffer to clear the echo command
     tokio::time::sleep(Duration::from_millis(100)).await;
     while let Some(msg) = channel.wait().await {
         match msg {
             ChannelMsg::Data { .. } => break,
-            ChannelMsg::Eof => return Err("Channel closed unexpectedly".to_string()),
+            ChannelMsg::Eof => return Err(TestError::ChannelClosed),
             _ => {}
         }
     }
@@ -95,7 +125,10 @@ pub async fn run_echo_test<H: client::Handler>(
 
         // Send one character
         let byte_slice = &write_buffer[idx..idx + 1];
-        channel.data(byte_slice).await.map_err(|e| e.to_string())?;
+        channel
+            .data(byte_slice)
+            .await
+            .map_err(|e| TestError::Ssh(e.to_string()))?;
 
         // Wait for echo back
         loop {
@@ -107,12 +140,12 @@ pub async fn run_echo_test<H: client::Handler>(
                         }
                     }
                     ChannelMsg::Eof => {
-                        return Err("Channel closed unexpectedly".to_string());
+                        return Err(TestError::ChannelClosed);
                     }
                     _ => {}
                 }
             } else {
-                return Err("Channel closed unexpectedly".to_string());
+                return Err(TestError::ChannelClosed);
             }
         }
 
@@ -130,10 +163,10 @@ pub async fn run_echo_test<H: client::Handler>(
 
     // Calculate latency statistics
     if latencies.is_empty() {
-        return Err("Unable to get any echos in given time".to_string());
+        return Err(TestError::EmptyEchoResult);
     }
     latencies.sort();
-    let result = EchoTestSummary::from_latencies(&latencies, formatter)?;
+    let result = EchoTestSummary::from_latencies(&latencies, formatter).map_err(TestError::Ssh)?;
     if result.char_sent < 20 {
         warn!("Insufficient data points for accurate latency measurement");
     }
@@ -185,7 +218,7 @@ async fn run_upload_test<H: client::Handler>(
     chunk_size: u64,
     remote_file: &Path,
     formatter: &Formatter,
-) -> Result<SpeedTestResult, String> {
+) -> Result<SpeedTestResult, TestError> {
     info!("Running upload speed test");
 
     // Establish SFTP channel
@@ -193,23 +226,25 @@ async fn run_upload_test<H: client::Handler>(
     let channel = session
         .channel_open_session()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| TestError::Ssh(e.to_string()))?;
     channel
         .request_subsystem(true, "sftp")
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| TestError::Ssh(e.to_string()))?;
     let sftp = SftpSession::new(channel.into_stream())
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| TestError::Ssh(e.to_string()))?;
 
     // Generate random data to upload in streaming chunks
     trace!("Generating random data in chunks");
-    let mut rng = rng();
     let dist = Uniform::try_from(0..128_u8).unwrap();
 
     // Open remote file for writing
-    let remote_path = remote_file.to_str().ok_or("Invalid remote file path")?;
-    let mut file = sftp.create(remote_path).await.map_err(|e| e.to_string())?;
+    let remote_path = remote_file.to_str().ok_or(TestError::InvalidRemotePath)?;
+    let mut file = sftp
+        .create(remote_path)
+        .await
+        .map_err(|e| TestError::Ssh(e.to_string()))?;
 
     // Preparing logging variables
     let mut total_bytes_sent = 0;
@@ -224,18 +259,22 @@ async fn run_upload_test<H: client::Handler>(
             .min((size as usize - total_bytes_sent) as u64)
             .max(1) as usize;
         let chunk: Vec<u8> = dist
-            .sample_iter(&mut rng)
+            .sample_iter(rng())
             .take(to_send)
             .map(|v| (v & 0x3f) + 32)
             .collect();
-        file.write_all(chunk).await.map_err(|e| e.to_string())?;
+        file.write_all(&chunk)
+            .await
+            .map_err(|e| TestError::Ssh(e.to_string()))?;
         total_bytes_sent += chunk.len();
         progress_bar.set_position(total_bytes_sent as u64);
     }
     progress_bar.finish_and_clear();
 
     // Close the file
-    file.shutdown().await.map_err(|e| e.to_string())?;
+    file.shutdown()
+        .await
+        .map_err(|e| TestError::Ssh(e.to_string()))?;
 
     let result = SpeedTestResult::new(total_bytes_sent as u64, start_time.elapsed(), formatter);
     info!(
@@ -251,7 +290,7 @@ async fn run_download_test<H: client::Handler>(
     chunk_size: u64,
     remote_file: &Path,
     formatter: &Formatter,
-) -> Result<SpeedTestResult, String> {
+) -> Result<SpeedTestResult, TestError> {
     info!("Running download speed test");
 
     // Establish SFTP channel
@@ -259,29 +298,32 @@ async fn run_download_test<H: client::Handler>(
     let channel = session
         .channel_open_session()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| TestError::Ssh(e.to_string()))?;
     channel
         .request_subsystem(true, "sftp")
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| TestError::Ssh(e.to_string()))?;
     let sftp = SftpSession::new(channel.into_stream())
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| TestError::Ssh(e.to_string()))?;
 
     // Get file size
-    let remote_path = remote_file.to_str().ok_or("Invalid remote file path")?;
+    let remote_path = remote_file.to_str().ok_or(TestError::InvalidRemotePath)?;
     let metadata = sftp
         .metadata(remote_path)
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| TestError::Ssh(e.to_string()))?;
     let size = metadata.len();
 
     if size == 0 {
-        return Err("Remote file is empty".to_string());
+        return Err(TestError::EmptyRemoteFile);
     }
 
     // Open remote file for reading
-    let mut file = sftp.open(remote_path).await.map_err(|e| e.to_string())?;
+    let mut file = sftp
+        .open(remote_path)
+        .await
+        .map_err(|e| TestError::Ssh(e.to_string()))?;
 
     // Prepare buffer for downloading
     trace!("Preparing buffer for downloading");
@@ -297,7 +339,7 @@ async fn run_download_test<H: client::Handler>(
     while size - total_bytes_recv > chunk_size {
         file.read_exact(&mut buffer)
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| TestError::Ssh(e.to_string()))?;
         total_bytes_recv += chunk_size;
         progress_bar.set_position(total_bytes_recv);
     }
@@ -305,7 +347,7 @@ async fn run_download_test<H: client::Handler>(
         let mut remaining = vec![0; (size - total_bytes_recv) as usize];
         file.read_exact(&mut remaining)
             .await
-            .map_err(|e| e.to_string())?;
+            .map_err(|e| TestError::Ssh(e.to_string()))?;
         total_bytes_recv += remaining.len() as u64;
         progress_bar.set_position(total_bytes_recv);
     }
@@ -326,7 +368,7 @@ pub async fn run_speed_test<H: client::Handler>(
     chunk_size: u64,
     remote_file: &Path,
     formatter: &Formatter,
-) -> Result<SpeedTestSummary, String> {
+) -> Result<SpeedTestSummary, TestError> {
     info!("Running speed test");
     debug!(
         "Running speed test with file size: {}",
