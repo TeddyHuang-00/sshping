@@ -119,17 +119,19 @@ async fn main() -> ExitCode {
             let mut row_count = 1;
             if let Some(result) = echo_test_result {
                 let records = result.to_formatted_frame();
-                if let Ok(span) = records.len().try_into() {
-                    modifications.push(((row_count + 1, 0), Span::row(span)));
-                }
+                let Ok(span) = records.len().try_into() else {
+                    unreachable!("records length always fits in isize")
+                };
+                modifications.push(((row_count + 1, 0), Span::row(span)));
                 row_count += records.len();
                 data.extend(records);
             }
             if let Some(result) = speed_test_result {
                 let records = result.to_formatted_frame();
-                if let Ok(span) = records.len().try_into() {
-                    modifications.push(((row_count + 1, 0), Span::row(span)));
-                }
+                let Ok(span) = records.len().try_into() else {
+                    unreachable!("records length always fits in isize")
+                };
+                modifications.push(((row_count + 1, 0), Span::row(span)));
                 data.extend(records);
             }
             let mut table = Table::new(data);
