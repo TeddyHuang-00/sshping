@@ -202,7 +202,7 @@ Password authentication is supported but not recommended. If no public key authe
 
 ### Why isn't XXX functionality of SSH supported?
 
-Many features like `ProxyJump` and `BindAddress` are currently not supported due to the limitation of upstream libraries.
+Many features like `BindAddress` are currently not supported due to the limitation of upstream libraries.
 
 If they got implemented in the upstream libraries, they will be added to this project as well. Or you can open a pull request to add them yourself!
 

@@ -405,7 +405,7 @@ async fn main() -> ExitCode {
                 }
             }
         } else {
-            let default_user = whoami::username();
+            let default_user = opts.target.user.clone();
             let first_jump = match endpoint_from_jump_spec(
                 jumps.first().expect("unreachable"),
                 opts.config.as_ref(),

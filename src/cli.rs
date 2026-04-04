@@ -66,7 +66,7 @@ pub struct Options {
     ///
     /// We get the user, host, port and identity file from ssh config
     ///
-    /// NOTE: Options like bind address, proxy jump, etc. are not supported
+    /// NOTE: Some options (for example BindAddress) are not supported
     #[arg(
         short = 'f',
         long,
