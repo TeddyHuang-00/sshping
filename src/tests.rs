@@ -251,25 +251,24 @@ async fn run_upload_test<H: client::Handler>(
 
     // Preparing logging variables
     let mut total_bytes_sent = 0;
-    let start_time: Instant = Instant::now();
+    let mut transfer_time = Duration::ZERO;
     let progress_bar = ProgressBar::new(size);
     progress_bar.set_style(get_progress_bar_style("Upload test"));
 
     // Starting uploading file
     trace!("Sending file in chunks");
     while total_bytes_sent < size as usize {
-        debug_assert!(total_bytes_sent < size as usize);
-        let to_send = chunk_size
-            .min((size as usize - total_bytes_sent) as u64)
-            .max(1) as usize;
+        let to_send = chunk_size.min((size as usize - total_bytes_sent) as u64) as usize;
         let chunk: Vec<u8> = dist
             .sample_iter(rng())
             .take(to_send)
             .map(|v| (v & 0x3f) + 32)
             .collect();
+        let start = Instant::now();
         file.write_all(&chunk)
             .await
             .map_err(|e| TestError::Ssh(e.to_string()))?;
+        transfer_time += start.elapsed();
         total_bytes_sent += chunk.len();
         progress_bar.set_position(total_bytes_sent as u64);
     }
@@ -280,7 +279,7 @@ async fn run_upload_test<H: client::Handler>(
         .await
         .map_err(|e| TestError::Ssh(e.to_string()))?;
 
-    let result = SpeedTestResult::new(total_bytes_sent as u64, start_time.elapsed(), formatter);
+    let result = SpeedTestResult::new(total_bytes_sent as u64, transfer_time, formatter);
     info!(
         "Sent {}, Time Elapsed: {}, Average Speed: {}",
         result.size, result.time, result.speed
@@ -334,30 +333,34 @@ async fn run_download_test<H: client::Handler>(
     let mut buffer = vec![0; chunk_size as usize];
     // Preparing logging variables
     let mut total_bytes_recv = 0;
-    let start_time: Instant = Instant::now();
+    let mut transfer_time = Duration::ZERO;
     let progress_bar = ProgressBar::new(size);
     progress_bar.set_style(get_progress_bar_style("Download test"));
 
     // Starting downloading file
     trace!("Receiving file in chunks");
     while size - total_bytes_recv > chunk_size {
+        let start = Instant::now();
         file.read_exact(&mut buffer)
             .await
             .map_err(|e| TestError::Ssh(e.to_string()))?;
+        transfer_time += start.elapsed();
         total_bytes_recv += chunk_size;
         progress_bar.set_position(total_bytes_recv);
     }
     if size - total_bytes_recv > 0 {
         let mut remaining = vec![0; (size - total_bytes_recv) as usize];
+        let start = Instant::now();
         file.read_exact(&mut remaining)
             .await
             .map_err(|e| TestError::Ssh(e.to_string()))?;
+        transfer_time += start.elapsed();
         total_bytes_recv += remaining.len() as u64;
         progress_bar.set_position(total_bytes_recv);
     }
     progress_bar.finish_and_clear();
 
-    let result = SpeedTestResult::new(total_bytes_recv, start_time.elapsed(), formatter);
+    let result = SpeedTestResult::new(total_bytes_recv, transfer_time, formatter);
     info!(
         "Received {}, Time Elapsed: {}, Average Speed: {}",
         result.size, result.time, result.speed
