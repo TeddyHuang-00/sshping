@@ -101,7 +101,7 @@ pub async fn run_echo_test<H: client::Handler>(
     progress_bar.set_style(get_progress_bar_style("Echo test"));
 
     let mut discarded_mismatch = 0usize;
-    'echo_loop: for (n, byte) in (0..char_count).zip(write_buffer.iter().copied().cycle()) {
+    'echo_loop: for (n, &byte) in write_buffer.iter().cycle().enumerate().take(char_count) {
         if let Some(deadline) = deadline
             && Instant::now() >= deadline
         {
@@ -110,24 +110,23 @@ pub async fn run_echo_test<H: client::Handler>(
         let start = Instant::now();
 
         // Send one character
-        let byte_slice = [byte];
         channel
-            .data(&byte_slice[..])
+            .data(&[byte][..])
             .await
             .map_err(|e| TestError::Ssh(e.to_string()))?;
 
         // Wait for echo back
         loop {
-            if let Some(byte) = pending_data.pop_front() {
-                if byte == byte_slice[0] {
+            if let Some(received_byte) = pending_data.pop_front() {
+                if received_byte == byte {
                     break;
                 }
                 discarded_mismatch += 1;
                 if discarded_mismatch == 1 || discarded_mismatch.is_multiple_of(64) {
                     trace!(
                         "Discarding unexpected echo byte (expected {:?}, got {:?}, discarded={discarded_mismatch})",
-                        byte_slice[0] as char,
-                        byte as char
+                        byte as char,
+                        received_byte as char
                     );
                 }
                 continue;
