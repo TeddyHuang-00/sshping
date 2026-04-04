@@ -1,4 +1,5 @@
 use std::{
+    collections::VecDeque,
     fmt,
     path::Path,
     time::{Duration, Instant},
@@ -105,17 +106,19 @@ pub async fn run_echo_test<H: client::Handler>(
 
     // Read the initial buffer to clear the echo command
     tokio::time::sleep(Duration::from_millis(100)).await;
-    while let Some(msg) = channel.wait().await {
-        match msg {
-            ChannelMsg::Data { .. } => break,
-            ChannelMsg::Eof => return Err(TestError::ChannelClosed),
-            _ => {}
+    loop {
+        match tokio::time::timeout(Duration::from_millis(10), channel.wait()).await {
+            Ok(Some(ChannelMsg::Eof)) => return Err(TestError::ChannelClosed),
+            Ok(Some(_)) => {}
+            Ok(None) => return Err(TestError::ChannelClosed),
+            Err(_) => break,
         }
     }
 
     // Prepare the echo test
     trace!("Testing echo latency");
     let write_buffer = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let mut pending_data = VecDeque::new();
     let mut latencies = Vec::with_capacity(char_count);
     let timeout = time_limit.map(Duration::from_secs_f64);
     let start_time = Instant::now();
@@ -134,11 +137,16 @@ pub async fn run_echo_test<H: client::Handler>(
 
         // Wait for echo back
         loop {
+            if let Some(pos) = pending_data.iter().position(|byte| *byte == byte_slice[0]) {
+                pending_data.drain(..=pos);
+                break;
+            }
+
             if let Some(msg) = channel.wait().await {
                 match msg {
                     ChannelMsg::Data { data } => {
-                        if !data.is_empty() {
-                            break;
+                        for byte in data.as_ref().iter().copied() {
+                            pending_data.push_back(byte);
                         }
                     }
                     ChannelMsg::Eof => {
