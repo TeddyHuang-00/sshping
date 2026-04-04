@@ -1,7 +1,7 @@
 # Based on typst's release action:
 # https://github.com/typst/typst/blob/main/.github/workflows/release.yml
 
-name: Test Build Binaries
+name: Check and Test Build
 on:
   push:
     branches:
