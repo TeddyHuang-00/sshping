@@ -94,7 +94,7 @@ jobs:
 
       - name: Update CHANGELOG
         id: changelog
-        uses: requarks/changelog-action@v1
+        uses: requarks/changelog-action@v1.10.3
         with:
           token: ${{ github.token }}
           tag: ${{ github.event.release.tag_name }}
