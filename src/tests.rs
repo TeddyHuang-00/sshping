@@ -257,8 +257,8 @@ async fn run_upload_test<H: client::Handler>(
 
     // Starting uploading file
     trace!("Sending file in chunks");
-    while total_bytes_sent < size as usize {
-        let to_send = chunk_size.min((size as usize - total_bytes_sent) as u64) as usize;
+    while total_bytes_sent < size {
+        let to_send = chunk_size.min(size - total_bytes_sent) as usize;
         let chunk: Vec<u8> = dist
             .sample_iter(rng())
             .take(to_send)
@@ -269,8 +269,8 @@ async fn run_upload_test<H: client::Handler>(
             .await
             .map_err(|e| TestError::Ssh(e.to_string()))?;
         transfer_time += start.elapsed();
-        total_bytes_sent += chunk.len();
-        progress_bar.set_position(total_bytes_sent as u64);
+        total_bytes_sent += chunk.len() as u64;
+        progress_bar.set_position(total_bytes_sent);
     }
     progress_bar.finish_and_clear();
 
@@ -279,7 +279,7 @@ async fn run_upload_test<H: client::Handler>(
         .await
         .map_err(|e| TestError::Ssh(e.to_string()))?;
 
-    let result = SpeedTestResult::new(total_bytes_sent as u64, transfer_time, formatter);
+    let result = SpeedTestResult::new(total_bytes_sent, transfer_time, formatter);
     info!(
         "Sent {}, Time Elapsed: {}, Average Speed: {}",
         result.size, result.time, result.speed
