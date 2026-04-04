@@ -1,11 +1,12 @@
 use std::{
+    env,
     io::{self, IsTerminal},
     path::PathBuf,
     sync::Arc,
     time::{Duration, Instant},
 };
 
-use log::{info, warn};
+use log::{debug, info, warn};
 use russh::{
     client,
     keys::{decode_secret_key, PrivateKeyWithHashAlg},
@@ -59,6 +60,26 @@ async fn authenticate_publickey<H: client::Handler>(
     Ok(())
 }
 
+fn discover_default_identity_files() -> Vec<PathBuf> {
+    let Some(home) = env::var_os("HOME") else {
+        return vec![];
+    };
+    let ssh_dir = PathBuf::from(home).join(".ssh");
+    [
+        "id_ed25519",
+        "id_ecdsa",
+        "id_ecdsa_sk",
+        "id_rsa",
+        "id_dsa",
+        "id_xmss",
+        "identity",
+    ]
+    .iter()
+    .map(|name| ssh_dir.join(name))
+    .filter(|path| path.exists() && path.is_file())
+    .collect()
+}
+
 async fn authenticate_password<H: client::Handler>(
     session: &mut client::Handle<H>,
     user: &str,
@@ -83,6 +104,7 @@ async fn authenticate_password<H: client::Handler>(
 pub async fn authenticate_all<H: client::Handler>(
     session: &mut client::Handle<H>,
     user: &str,
+    host: &str,
     password: Option<&str>,
     identity: Option<&PathBuf>,
     timeout: f64,
@@ -99,6 +121,24 @@ pub async fn authenticate_all<H: client::Handler>(
         return Ok(start.elapsed());
     }
 
+    if identity.is_none() {
+        let discovered_identities = discover_default_identity_files();
+        if !discovered_identities.is_empty() {
+            debug!(
+                "No explicit identity provided for {user}@{host}, trying default identities from ~/.ssh"
+            );
+        }
+        for discovered_identity in discovered_identities {
+            if authenticate_publickey(session, user, &discovered_identity, password, timeout)
+                .await
+                .inspect_err(|e| warn!("{e}"))
+                .is_ok()
+            {
+                return Ok(start.elapsed());
+            }
+        }
+    }
+
     // Try password authentication with provided password
     if let Some(pwd) = password
         && authenticate_password(session, user, pwd, timeout)
@@ -112,7 +152,7 @@ pub async fn authenticate_all<H: client::Handler>(
     // If no password was provided and we're in an interactive terminal,
     // prompt for one
     if password.is_none() && io::stdin().is_terminal() {
-        eprint!("{}'s password: ", user);
+        eprint!("Password for {user}@{host}: ");
         if let Ok(pwd) = rpassword::read_password()
             && !pwd.is_empty()
             && authenticate_password(session, user, &pwd, timeout)

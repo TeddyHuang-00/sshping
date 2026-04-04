@@ -64,9 +64,13 @@ pub struct Options {
 
     /// Read the ssh config file FILE for options
     ///
-    /// We get the user, host, port and identity file from ssh config
+    /// Per endpoint (target and each ProxyJump hop), sshping resolves:
+    /// user/host/port and the first IdentityFile from matching Host config.
     ///
-    /// NOTE: Options like bind address, proxy jump, etc. are not supported
+    /// Identity precedence per endpoint:
+    /// Host IdentityFile > --identity > default SSH key discovery.
+    ///
+    /// NOTE: Some options (for example BindAddress) are not supported
     #[arg(
         short = 'f',
         long,
@@ -97,6 +101,8 @@ pub struct Options {
     ///
     /// TIP: If you have already added the key to ssh-agent,
     /// you don't need to specify this
+    ///
+    /// This is used per endpoint only when no Host-specific IdentityFile exists.
     #[arg(
         short,
         long,

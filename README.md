@@ -191,18 +191,23 @@ If your private key is encrypted with a passphrase, you can either:
 - Provide it via the `-p` flag: `sshping user@host -i ~/.ssh/id_rsa -p "your-passphrase"` (not recommended for security)
 - Let the tool prompt you interactively (recommended): When running in an interactive terminal, you'll be prompted to enter the passphrase securely
 
-Note: SSH agent authentication is not currently supported. Support may be added in future releases as the underlying russh library evolves.
+Authentication identity precedence is resolved **per endpoint** (target and each ProxyJump hop) in this order:
+1. SSH config `IdentityFile` from the matching `Host` block for that endpoint
+2. CLI `--identity` file
+3. Fallback key discovery/default auth attempts (for example default keys under `~/.ssh`)
+
+This means proxy hops can use their own configured keys while the target can use a different key or fall back.
 
 ### What about password authentication?
 
 Password authentication is supported but not recommended. If no public key authentication is configured, the tool will:
 - Use the password provided via `-p` flag if available
-- Prompt you interactively for a password when running in an interactive terminal (recommended over `-p` flag)
+- Prompt you interactively for a password for the specific `user@host` endpoint when running in an interactive terminal (recommended over `-p` flag)
 - Fail if neither is available or in non-interactive environments (scripts, CI/CD)
 
 ### Why isn't XXX functionality of SSH supported?
 
-Many features like `ProxyJump` and `BindAddress` are currently not supported due to the limitation of upstream libraries.
+Many features like `BindAddress` are currently not supported due to the limitation of upstream libraries.
 
 If they got implemented in the upstream libraries, they will be added to this project as well. Or you can open a pull request to add them yourself!
 

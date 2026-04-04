@@ -1,22 +1,17 @@
 mod auth;
+mod client;
 mod cli;
 mod summary;
 mod tests;
 mod util;
 
-use std::{
-    io::Read,
-    process::ExitCode,
-    sync::Arc,
-};
+use std::{io::Read, process::ExitCode, time::Instant};
 
-use auth::authenticate_all;
 use clap::Parser;
+use client::{build_connection_plan, connect_plan};
 use cli::{Options, Test};
 use log::{debug, error, trace, LevelFilter};
-use russh::client;
 use simple_logger::SimpleLogger;
-use russh_config::parse_path;
 use summary::Record;
 use tabled::{
     settings::{themes::BorderCorrection, Alignment, Span},
@@ -24,19 +19,6 @@ use tabled::{
 };
 use tests::{run_echo_test, run_speed_test};
 use util::Formatter;
-
-struct SshHandler;
-
-impl client::Handler for SshHandler {
-    type Error = russh::Error;
-
-    async fn check_server_key(
-        &mut self,
-        _server_public_key: &russh::keys::ssh_key::PublicKey,
-    ) -> Result<bool, Self::Error> {
-        Ok(true)
-    }
-}
 
 #[tokio::main]
 async fn main() -> ExitCode {
@@ -62,83 +44,28 @@ async fn main() -> ExitCode {
     // Get the formatter for output
     let formatter = Formatter::new(opts.human_readable, opts.delimiter);
 
-    // Respect the SSH configuration file if it exists
-    if let Some(ssh_config) = &opts.config
-        && ssh_config.exists()
-    {
-        debug!("SSH Config: {:?}", ssh_config);
-        let config = parse_path(ssh_config, opts.target.host.as_str())
-            .expect("Failed to parse configuration");
-
-        // Update options with configuration
-        let config_host = config.host();
-        if !config_host.is_empty() {
-            opts.target.host = config_host.to_string();
+    let plan = match build_connection_plan(&mut opts) {
+        Ok(plan) => plan,
+        Err(e) => {
+            error!("{e}");
+            return ExitCode::FAILURE;
         }
-        if let Some(user) = config.host_config.user {
-            opts.target.user = user;
-        }
-        if let Some(port) = config.host_config.port {
-            opts.target.port = port;
-        }
-        if let Some(identity) = config
-            .host_config
-            .identity_file
-            .and_then(|files| files.first().cloned())
-        {
-            opts.identity = Some(identity);
-        }
-    }
+    };
 
     trace!("Options: {:?}", opts);
     debug!("User: {}", opts.target.user);
     debug!("Host: {}", opts.target.host);
     debug!("Port: {}", opts.target.port);
 
-    // Connect to the SSH server
-    let config = Arc::new(client::Config {
-        inactivity_timeout: Some(std::time::Duration::from_secs_f64(opts.ssh_timeout)),
-        ..Default::default()
-    });
-    let handler = SshHandler;
-
-    let addr = (opts.target.host.as_str(), opts.target.port);
-    let mut session = match tokio::time::timeout(
-        std::time::Duration::from_secs_f64(opts.ssh_timeout),
-        client::connect(config, addr, handler),
-    )
-    .await
-    {
-        Ok(Ok(session)) => session,
-        Ok(Err(e)) => {
-            error!("Failed to connect to server: {e}");
-            return ExitCode::FAILURE;
-        }
-        Err(_) => {
-            error!("Connection timeout");
-            return ExitCode::FAILURE;
-        }
-    };
-
-    // Try to authenticate with the server using:
-    // 1) identity in the agent;
-    // 2) specified identity;
-    // 3) password
-    let ssh_connect_time = match authenticate_all(
-        &mut session,
-        &opts.target.user,
-        opts.password.as_deref(),
-        opts.identity.as_ref(),
-        opts.ssh_timeout,
-    )
-    .await
-    {
-        Ok(time) => time,
+    let connect_start = Instant::now();
+    let mut session = match connect_plan(&plan, opts.ssh_timeout, opts.password.as_deref()).await {
+        Ok(session) => session,
         Err(e) => {
-            error!("Exiting due to authenticate: {e}");
+            error!("Failed to connect/authenticate: {e}");
             return ExitCode::FAILURE;
         }
     };
+    let ssh_connect_time = connect_start.elapsed();
 
     // Running tests
     let echo_test_result = if opts.run_tests == Test::Echo || opts.run_tests == Test::Both {
