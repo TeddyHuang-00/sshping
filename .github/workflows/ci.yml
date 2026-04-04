@@ -13,6 +13,30 @@ on:
   workflow_dispatch:
 
 jobs:
+  format:
+    name: code format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rustfmt
+
+      - name: Run Rustfmt
+        run: cargo +nightly fmt --all -- --check
+
+  check:
+    name: clippy check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Run Clippy
+        run: cargo clippy --locked --all-targets -- -D warnings
+
   test-build:
     name: test ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
