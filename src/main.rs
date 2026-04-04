@@ -16,7 +16,6 @@ use auth::authenticate_all;
 use clap::Parser;
 use cli::{Options, Test};
 use log::{debug, error, trace, LevelFilter};
-use regex::Regex;
 use russh::{ChannelMsg, client};
 use simple_logger::SimpleLogger;
 use russh_config::parse_path;
@@ -57,47 +56,51 @@ struct JumpSpec {
 }
 
 fn parse_proxy_jump(proxy_jump: &str) -> Result<Vec<JumpSpec>, String> {
-    let target_pat = Regex::new(r"^(?:([a-zA-Z0-9_.-]+)@)?([a-zA-Z0-9_.-]+)(?::(\d+))?$")
-        .map_err(|e| format!("Failed to build ProxyJump parser: {e}"))?;
     proxy_jump
         .split(',')
         .map(str::trim)
         .filter(|item| !item.is_empty() && !item.eq_ignore_ascii_case("none"))
         .map(|item| {
-            let captures = target_pat
-                .captures(item)
-                .ok_or_else(|| format!("Invalid ProxyJump target format: {item}"))?;
-            let user = captures.get(1).map(|m| m.as_str().to_string());
-            let host = captures
-                .get(2)
-                .map(|m| m.as_str().to_string())
-                .ok_or_else(|| format!("Invalid ProxyJump host: {item}"))?;
-            let port = captures
-                .get(3)
-                .map(|m| {
-                    m.as_str()
-                        .parse::<u16>()
-                        .map_err(|e| format!("Invalid ProxyJump port in {item}: {e}"))
-                })
-                .transpose()?;
+            let (user, host_port) = if let Some((user, host_port)) = item.rsplit_once('@') {
+                if user.is_empty() {
+                    return Err(format!("Invalid ProxyJump user in target: {item}"));
+                }
+                (Some(user.to_string()), host_port)
+            } else {
+                (None, item)
+            };
+            let (host, port) = if let Some((host, port)) = host_port.rsplit_once(':') {
+                let port = port
+                    .parse::<u16>()
+                    .map_err(|e| format!("Invalid ProxyJump port in {item}: {e}"))?;
+                (host.to_string(), Some(port))
+            } else {
+                (host_port.to_string(), None)
+            };
+            if host.is_empty() {
+                return Err(format!("Invalid ProxyJump host: {item}"));
+            }
             Ok(JumpSpec { user, host, port })
         })
         .collect()
 }
 
-fn wildcard_pattern_match(host: &str, pattern: &str) -> bool {
-    let mut regex_pattern = String::from("^");
-    for c in pattern.chars() {
-        match c {
-            '*' => regex_pattern.push_str(".*"),
-            '?' => regex_pattern.push('.'),
-            _ => regex_pattern.push_str(&regex::escape(c.to_string().as_str())),
-        }
+fn wildcard_pattern_match_recursive(host: &[u8], pattern: &[u8]) -> bool {
+    if pattern.is_empty() {
+        return host.is_empty();
     }
-    regex_pattern.push('$');
-    Regex::new(&regex_pattern)
-        .map(|r| r.is_match(host))
-        .unwrap_or(false)
+    match pattern[0] {
+        b'*' => {
+            wildcard_pattern_match_recursive(host, &pattern[1..])
+                || (!host.is_empty() && wildcard_pattern_match_recursive(&host[1..], pattern))
+        }
+        b'?' => !host.is_empty() && wildcard_pattern_match_recursive(&host[1..], &pattern[1..]),
+        c => !host.is_empty() && host[0] == c && wildcard_pattern_match_recursive(&host[1..], &pattern[1..]),
+    }
+}
+
+fn wildcard_pattern_match(host: &str, pattern: &str) -> bool {
+    wildcard_pattern_match_recursive(host.as_bytes(), pattern.as_bytes())
 }
 
 fn host_patterns_match(host: &str, patterns: &str) -> bool {
@@ -406,8 +409,12 @@ async fn main() -> ExitCode {
             }
         } else {
             let default_user = opts.target.user.clone();
+            let Some(first_jump_spec) = jumps.first() else {
+                error!("BUG: jumps vector unexpectedly empty");
+                return ExitCode::FAILURE;
+            };
             let first_jump = match endpoint_from_jump_spec(
-                jumps.first().expect("unreachable"),
+                first_jump_spec,
                 opts.config.as_ref(),
                 default_user.as_str(),
             ) {
@@ -441,7 +448,10 @@ async fn main() -> ExitCode {
                             return ExitCode::FAILURE;
                         }
                     };
-                let previous_jump = jump_sessions.last_mut().expect("at least one jump session");
+                let Some(previous_jump) = jump_sessions.last_mut() else {
+                    error!("BUG: jump_sessions should contain at least the first jump session");
+                    return ExitCode::FAILURE;
+                };
                 let jump_session = match connect_and_authenticate_through_jump(
                     previous_jump,
                     &endpoint,
@@ -459,7 +469,10 @@ async fn main() -> ExitCode {
                 jump_sessions.push(jump_session);
             }
 
-            let last_jump = jump_sessions.last_mut().expect("at least one jump session");
+            let Some(last_jump) = jump_sessions.last_mut() else {
+                error!("BUG: jump_sessions should contain at least one jump session");
+                return ExitCode::FAILURE;
+            };
             match connect_and_authenticate_through_jump(
                 last_jump,
                 &target_endpoint,
