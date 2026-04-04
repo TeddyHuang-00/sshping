@@ -156,7 +156,6 @@ struct JumpSpec {
 }
 
 pub fn build_connection_plan(opts: &mut Options) -> Result<ConnectionPlan> {
-    let target = &mut opts.target;
     let cli_identity = opts.identity.clone();
     let mut proxy_jump = None;
     let mut proxy_command = None;
@@ -167,20 +166,21 @@ pub fn build_connection_plan(opts: &mut Options) -> Result<ConnectionPlan> {
         && ssh_config.exists()
     {
         debug!("SSH Config: {:?}", ssh_config);
-        let config =
-            parse_path(ssh_config, target.host.as_str()).map_err(|e| ClientError::ConfigParse {
+        let config = parse_path(ssh_config, opts.target.host.as_str()).map_err(|e| {
+            ClientError::ConfigParse {
                 context: "configuration",
                 source: e.to_string(),
-            })?;
+            }
+        })?;
         if !config.host().is_empty() {
-            target.host = config.host().to_string();
+            opts.target.host = config.host().to_string();
         }
         if let Some(user) = config.host_config.user {
-            target.user = user;
+            opts.target.user = user;
             target_user_source = Source::TargetHostConfig;
         }
         if let Some(port) = config.host_config.port {
-            target.port = port;
+            opts.target.port = port;
         }
         target_identity_from_config = config
             .host_config
@@ -196,10 +196,10 @@ pub fn build_connection_plan(opts: &mut Options) -> Result<ConnectionPlan> {
         Source::TargetHostConfig,
     );
     let target = Endpoint {
-        host: target.host.clone(),
-        port: target.port,
+        host: opts.target.host.clone(),
+        port: opts.target.port,
         auth: AuthSpec {
-            user: target.user.clone(),
+            user: opts.target.user.clone(),
             identity: target_identity.0,
             identity_source: target_identity.1,
             user_source: target_user_source,
