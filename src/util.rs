@@ -22,32 +22,38 @@ impl Formatter {
     }
 
     pub fn format_duration(&self, time: Duration) -> String {
-        if let Some(format) = &self.format {
-            let mut buffer = Buffer::new();
-            buffer.write_formatted(&time.as_nanos(), format);
-            buffer.as_str().to_string() + "ns"
-        } else {
-            let formatted = humantime::format_duration(time).to_string();
-            let parts = formatted.split(" ").collect::<Vec<&str>>();
-            if parts.len() > 2 {
-                parts[..2].join(" ")
-            } else {
-                formatted
-            }
-        }
+        self.format.as_ref().map_or_else(
+            || {
+                let formatted = humantime::format_duration(time).to_string();
+                let parts = formatted.split(" ").collect::<Vec<&str>>();
+                if parts.len() > 2 {
+                    parts[..2].join(" ")
+                } else {
+                    formatted
+                }
+            },
+            |format| {
+                let mut buffer = Buffer::new();
+                buffer.write_formatted(&time.as_nanos(), format);
+                buffer.as_str().to_string() + "ns"
+            },
+        )
     }
 
     pub fn format_size(&self, size: u64) -> String {
-        if let Some(format) = &self.format {
-            let mut buffer = Buffer::new();
-            buffer.write_formatted(&size, format);
-            buffer.as_str().to_string() + " B"
-        } else {
-            Size::from_bytes(size)
-                .format()
-                .with_base(Base::Base10)
-                .with_style(Style::Abbreviated)
-                .to_string()
-        }
+        self.format.as_ref().map_or_else(
+            || {
+                Size::from_bytes(size)
+                    .format()
+                    .with_base(Base::Base10)
+                    .with_style(Style::Abbreviated)
+                    .to_string()
+            },
+            |format| {
+                let mut buffer = Buffer::new();
+                buffer.write_formatted(&size, format);
+                buffer.as_str().to_string() + " B"
+            },
+        )
     }
 }

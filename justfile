@@ -8,7 +8,7 @@ format:
 
 # Check unused dependencies
 deps:
-    cargo +nightly udeps 
+    cargo +nightly udeps
 
 # Check for errors
 check: format
@@ -17,9 +17,8 @@ check: format
 
 # Unit tests
 test: check
-    cargo test 
+    cargo test
 
 # Coverage report
 coverage: check
     cargo tarpaulin --out Html --output-dir coverage
-

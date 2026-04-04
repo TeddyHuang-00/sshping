@@ -103,7 +103,7 @@ pub struct Record {
 }
 
 impl Record {
-    pub fn new(test: &'static str, metric: &'static str, result: String) -> Self {
+    pub const fn new(test: &'static str, metric: &'static str, result: String) -> Self {
         Self {
             test,
             metric,

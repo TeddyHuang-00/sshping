@@ -14,7 +14,7 @@ fn main() -> Result<(), Error> {
 
     let mut cmd = Options::command();
     // New directory for completions in target/<profile>/completions
-    let completion_path = PathBuf::from(outdir.clone())
+    let completion_path = PathBuf::from(outdir)
         .ancestors()
         .nth(3)
         .unwrap()

@@ -32,19 +32,19 @@ pub enum TableStyle {
 impl TableStyle {
     pub fn stylize<'a>(&self, table: &'a mut Table) -> &'a mut Table {
         match self {
-            TableStyle::Empty => table.with(Style::empty()),
-            TableStyle::Blank => table.with(Style::blank()),
-            TableStyle::ASCII => table.with(Style::ascii()),
-            TableStyle::PSQL => table.with(Style::psql()),
-            TableStyle::Markdown => table.with(Style::markdown()),
-            TableStyle::Modern => table.with(Style::modern()),
-            TableStyle::Sharp => table.with(Style::sharp()),
-            TableStyle::Extended => table.with(Style::extended()),
-            TableStyle::Dots => table.with(Style::dots()),
-            TableStyle::RST => table.with(Style::re_structured_text()),
-            TableStyle::Rounded => table.with(Style::rounded()),
-            TableStyle::ASCIIRounded => table.with(Style::ascii_rounded()),
-            TableStyle::ModernRounded => table.with(Style::modern_rounded()),
+            Self::Empty => table.with(Style::empty()),
+            Self::Blank => table.with(Style::blank()),
+            Self::ASCII => table.with(Style::ascii()),
+            Self::PSQL => table.with(Style::psql()),
+            Self::Markdown => table.with(Style::markdown()),
+            Self::Modern => table.with(Style::modern()),
+            Self::Sharp => table.with(Style::sharp()),
+            Self::Extended => table.with(Style::extended()),
+            Self::Dots => table.with(Style::dots()),
+            Self::RST => table.with(Style::re_structured_text()),
+            Self::Rounded => table.with(Style::rounded()),
+            Self::ASCIIRounded => table.with(Style::ascii_rounded()),
+            Self::ModernRounded => table.with(Style::modern_rounded()),
         }
     }
 }
@@ -102,7 +102,8 @@ pub struct Options {
     /// TIP: If you have already added the key to ssh-agent,
     /// you don't need to specify this
     ///
-    /// This is used per endpoint only when no Host-specific IdentityFile exists.
+    /// This is used per endpoint only when no Host-specific IdentityFile
+    /// exists.
     #[arg(
         short,
         long,
@@ -318,7 +319,7 @@ fn parse_file_size(s: &str) -> Result<u64, String> {
     Ok(size)
 }
 
-fn get_styles() -> Styles {
+const fn get_styles() -> Styles {
     Styles::styled()
         .header(AnsiColor::Green.on_default().bold())
         .usage(AnsiColor::Green.on_default().bold())

@@ -21,7 +21,7 @@ impl client::Handler for SshHandler {
     }
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Source {
     TargetHostConfig,
     ProxyHostConfig,
@@ -33,15 +33,15 @@ pub enum Source {
 }
 
 impl Source {
-    fn as_str(self) -> &'static str {
+    const fn as_str(self) -> &'static str {
         match self {
-            Source::TargetHostConfig => "target host config",
-            Source::ProxyHostConfig => "proxy host config",
-            Source::CliIdentity => "cli identity",
-            Source::JumpSpec => "jump spec",
-            Source::TargetDefault => "target/default",
-            Source::InheritedDefault => "inherited/default",
-            Source::Fallback => "fallback",
+            Self::TargetHostConfig => "target host config",
+            Self::ProxyHostConfig => "proxy host config",
+            Self::CliIdentity => "cli identity",
+            Self::JumpSpec => "jump spec",
+            Self::TargetDefault => "target/default",
+            Self::InheritedDefault => "inherited/default",
+            Self::Fallback => "fallback",
         }
     }
 }
@@ -105,10 +105,19 @@ pub struct ConnectionPlan {
 
 #[derive(Debug)]
 pub enum ClientError {
-    ConfigParse { context: &'static str, source: String },
+    ConfigParse {
+        context: &'static str,
+        source: String,
+    },
     InvalidProxyJump(String),
-    Connect { host: String, source: String },
-    Timeout { context: &'static str, host: String },
+    Connect {
+        host: String,
+        source: String,
+    },
+    Timeout {
+        context: &'static str,
+        host: String,
+    },
     Auth(String),
     Route(String),
 }
@@ -116,16 +125,18 @@ pub enum ClientError {
 impl fmt::Display for ClientError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ClientError::ConfigParse { context, source } => {
+            Self::ConfigParse { context, source } => {
                 write!(f, "Failed to parse {context}: {source}")
             }
-            ClientError::InvalidProxyJump(msg) => write!(f, "{msg}"),
-            ClientError::Connect { host, source } => write!(f, "Failed to connect to {host}: {source}"),
-            ClientError::Timeout { context, host } => {
+            Self::InvalidProxyJump(msg) => write!(f, "{msg}"),
+            Self::Connect { host, source } => {
+                write!(f, "Failed to connect to {host}: {source}")
+            }
+            Self::Timeout { context, host } => {
                 write!(f, "Connection timeout when {context} {host}")
             }
-            ClientError::Auth(msg) => write!(f, "{msg}"),
-            ClientError::Route(msg) => write!(f, "{msg}"),
+            Self::Auth(msg) => write!(f, "{msg}"),
+            Self::Route(msg) => write!(f, "{msg}"),
         }
     }
 }
@@ -242,22 +253,27 @@ pub async fn connect_plan(
         }
         Route::ProxyJump(hops) => {
             let mut iter = hops.iter();
-            let first = iter
-                .next()
-                .ok_or_else(|| ClientError::Route("ProxyJump route unexpectedly empty".to_string()))?;
+            let first = iter.next().ok_or_else(|| {
+                ClientError::Route("ProxyJump route unexpectedly empty".to_string())
+            })?;
             let mut upstream = first
-                .authenticate(connect_via(Transport::Direct(first), timeout).await?, password, timeout)
+                .authenticate(
+                    connect_via(Transport::Direct(first), timeout).await?,
+                    password,
+                    timeout,
+                )
                 .await?;
 
             for hop in iter {
-                let session =
-                    connect_via(Transport::Jump(&mut upstream, hop), timeout).await?;
+                let session = connect_via(Transport::Jump(&mut upstream, hop), timeout).await?;
                 upstream = hop.authenticate(session, password, timeout).await?;
             }
 
             let target_session =
                 connect_via(Transport::Jump(&mut upstream, &plan.target), timeout).await?;
-            plan.target.authenticate(target_session, password, timeout).await
+            plan.target
+                .authenticate(target_session, password, timeout)
+                .await
         }
     }
 }
@@ -267,13 +283,14 @@ pub fn resolve_identity(
     cli_identity: Option<&PathBuf>,
     host_config_source: Source,
 ) -> (Option<PathBuf>, Source) {
-    if let Some(identity) = host_config_identity {
-        (Some(identity), host_config_source)
-    } else if let Some(identity) = cli_identity {
-        (Some(identity.clone()), Source::CliIdentity)
-    } else {
-        (None, Source::Fallback)
-    }
+    host_config_identity.map_or_else(
+        || {
+            cli_identity.map_or((None, Source::Fallback), |identity| {
+                (Some(identity.clone()), Source::CliIdentity)
+            })
+        },
+        |identity| (Some(identity), host_config_source),
+    )
 }
 
 pub fn resolve_user(
@@ -283,13 +300,15 @@ pub fn resolve_user(
     host_config_source: Source,
     explicit_source: Source,
 ) -> (String, Source) {
-    if let Some(user) = explicit_user {
-        (user.to_string(), explicit_source)
-    } else if let Some(user) = host_config_user {
-        (user, host_config_source)
-    } else {
-        (inherited_user.to_string(), Source::InheritedDefault)
-    }
+    explicit_user.map_or_else(
+        || {
+            host_config_user.map_or_else(
+                || (inherited_user.to_string(), Source::InheritedDefault),
+                |user| (user, host_config_source),
+            )
+        },
+        |user| (user.to_string(), explicit_source),
+    )
 }
 
 fn resolve_jump_endpoint(
@@ -301,27 +320,28 @@ fn resolve_jump_endpoint(
     let mut host = spec.host.clone();
     let mut host_config_user = None;
     let mut port = 22;
-    let mut host_config_identity = None;
 
-    if let Some(ssh_config) = ssh_config
+    let host_config_identity = if let Some(ssh_config) = ssh_config
         && ssh_config.exists()
     {
-        let config = parse_path(ssh_config, spec.host.as_str()).map_err(|e| {
-            ClientError::ConfigParse {
+        let config =
+            parse_path(ssh_config, spec.host.as_str()).map_err(|e| ClientError::ConfigParse {
                 context: "jump host configuration",
                 source: e.to_string(),
-            }
-        })?;
+            })?;
         if !config.host().is_empty() {
             host = config.host().to_string();
         }
         host_config_user = config.host_config.user.clone();
         port = config.port();
-        host_config_identity = config
+
+        config
             .host_config
             .identity_file
-            .and_then(|files| files.first().cloned());
-    }
+            .and_then(|files| files.first().cloned())
+    } else {
+        None
+    };
 
     let (user, user_source) = resolve_user(
         host_config_user,
@@ -374,7 +394,9 @@ fn parse_proxy_jump(proxy_jump: &str) -> Result<Vec<JumpSpec>> {
                     None
                 } else if let Some(port_str) = rest.strip_prefix(':') {
                     Some(port_str.parse::<u16>().map_err(|e| {
-                        ClientError::InvalidProxyJump(format!("Invalid ProxyJump port in {item}: {e}"))
+                        ClientError::InvalidProxyJump(format!(
+                            "Invalid ProxyJump port in {item}: {e}"
+                        ))
                     })?)
                 } else {
                     return Err(ClientError::InvalidProxyJump(format!(
@@ -427,13 +449,10 @@ async fn connect_via(transport: Transport<'_>, timeout: f64) -> Result<client::H
                     source: e.to_string(),
                 }
             })?;
-            let stream = parsed
-                .stream()
-                .await
-                .map_err(|e| ClientError::Connect {
-                    host: endpoint.host.clone(),
-                    source: format!("Failed to connect through ProxyCommand: {e}"),
-                })?;
+            let stream = parsed.stream().await.map_err(|e| ClientError::Connect {
+                host: endpoint.host.clone(),
+                source: format!("Failed to connect through ProxyCommand: {e}"),
+            })?;
             connect_with_timeout(
                 "stream-connecting through ProxyCommand to",
                 &endpoint.host,
@@ -444,7 +463,12 @@ async fn connect_via(transport: Transport<'_>, timeout: f64) -> Result<client::H
         }
         Transport::Jump(upstream, endpoint) => {
             let channel = upstream
-                .channel_open_direct_tcpip(endpoint.host.clone(), endpoint.port as u32, "127.0.0.1", 0)
+                .channel_open_direct_tcpip(
+                    endpoint.host.clone(),
+                    endpoint.port as u32,
+                    "127.0.0.1",
+                    0,
+                )
                 .await
                 .map_err(|e| ClientError::Connect {
                     host: endpoint.host.clone(),
@@ -492,8 +516,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_proxy_jump, resolve_identity, resolve_user, Source};
     use std::path::PathBuf;
+
+    use super::{parse_proxy_jump, resolve_identity, resolve_user, Source};
 
     #[test]
     fn identity_prefers_host_config_then_cli_then_fallback() {

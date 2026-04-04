@@ -34,7 +34,7 @@ fn get_progress_bar_style(test_name: &str) -> ProgressStyle {
 }
 
 pub async fn run_echo_test<H: client::Handler>(
-    session: &mut client::Handle<H>,
+    session: &client::Handle<H>,
     echo_cmd: &str,
     char_count: usize,
     time_limit: Option<f64>,
@@ -178,7 +178,7 @@ pub async fn run_echo_test<H: client::Handler>(
 }
 
 async fn run_upload_test<H: client::Handler>(
-    session: &mut client::Handle<H>,
+    session: &client::Handle<H>,
     size: u64,
     chunk_size: u64,
     remote_file: &Path,
@@ -241,7 +241,7 @@ async fn run_upload_test<H: client::Handler>(
 }
 
 async fn run_download_test<H: client::Handler>(
-    session: &mut client::Handle<H>,
+    session: &client::Handle<H>,
     chunk_size: u64,
     remote_file: &Path,
     formatter: &Formatter,
@@ -315,7 +315,7 @@ async fn run_download_test<H: client::Handler>(
 }
 
 pub async fn run_speed_test<H: client::Handler>(
-    session: &mut client::Handle<H>,
+    session: &client::Handle<H>,
     size: u64,
     chunk_size: u64,
     remote_file: &PathBuf,

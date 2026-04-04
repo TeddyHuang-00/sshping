@@ -1,6 +1,6 @@
 mod auth;
-mod client;
 mod cli;
+mod client;
 mod summary;
 mod tests;
 mod util;
@@ -8,8 +8,8 @@ mod util;
 use std::{io::Read, process::ExitCode, time::Instant};
 
 use clap::Parser;
-use client::{build_connection_plan, connect_plan};
 use cli::{Options, Test};
+use client::{build_connection_plan, connect_plan};
 use log::{debug, error, trace, LevelFilter};
 use simple_logger::SimpleLogger;
 use summary::Record;
@@ -58,7 +58,7 @@ async fn main() -> ExitCode {
     debug!("Port: {}", opts.target.port);
 
     let connect_start = Instant::now();
-    let mut session = match connect_plan(&plan, opts.ssh_timeout, opts.password.as_deref()).await {
+    let session = match connect_plan(&plan, opts.ssh_timeout, opts.password.as_deref()).await {
         Ok(session) => session,
         Err(e) => {
             error!("Failed to connect/authenticate: {e}");
@@ -70,7 +70,7 @@ async fn main() -> ExitCode {
     // Running tests
     let echo_test_result = if opts.run_tests == Test::Echo || opts.run_tests == Test::Both {
         match run_echo_test(
-            &mut session,
+            &session,
             &opts.echo_cmd,
             opts.char_count,
             opts.echo_timeout,
@@ -89,7 +89,7 @@ async fn main() -> ExitCode {
     };
     let speed_test_result = if opts.run_tests == Test::Speed || opts.run_tests == Test::Both {
         match run_speed_test(
-            &mut session,
+            &session,
             opts.size,
             opts.chunk_size,
             &opts.remote_file,
