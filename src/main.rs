@@ -358,12 +358,8 @@ async fn main() -> ExitCode {
             }
         } else {
             let default_user = opts.target.user.clone();
-            let Some(first_jump_spec) = jumps.first() else {
-                error!("BUG: jumps vector unexpectedly empty");
-                return ExitCode::FAILURE;
-            };
             let first_jump = match endpoint_from_jump_spec(
-                first_jump_spec,
+                jumps.first().expect("non-empty jumps"),
                 opts.config.as_ref(),
                 default_user.as_str(),
             ) {
@@ -397,12 +393,8 @@ async fn main() -> ExitCode {
                             return ExitCode::FAILURE;
                         }
                     };
-                let Some(previous_jump) = jump_sessions.last_mut() else {
-                    error!("BUG: jump_sessions should contain at least the first jump session");
-                    return ExitCode::FAILURE;
-                };
                 let jump_session = match connect_and_authenticate_through_jump(
-                    previous_jump,
+                    jump_sessions.last_mut().expect("at least one jump session"),
                     &endpoint,
                     opts.ssh_timeout,
                     opts.password.as_deref(),
@@ -418,12 +410,8 @@ async fn main() -> ExitCode {
                 jump_sessions.push(jump_session);
             }
 
-            let Some(last_jump) = jump_sessions.last_mut() else {
-                error!("BUG: jump_sessions should contain at least one jump session");
-                return ExitCode::FAILURE;
-            };
             match connect_and_authenticate_through_jump(
-                last_jump,
+                jump_sessions.last_mut().expect("at least one jump session"),
                 &target_endpoint,
                 opts.ssh_timeout,
                 opts.password.as_deref(),
@@ -439,10 +427,7 @@ async fn main() -> ExitCode {
         }
     } else {
         if proxy_command.is_some() && opts.config.as_ref().is_some_and(|c| c.exists()) {
-            let Some(config_path) = opts.config.as_ref() else {
-                error!("SSH config path is unavailable for ProxyCommand");
-                return ExitCode::FAILURE;
-            };
+            let config_path = opts.config.as_ref().expect("config exists by condition");
             match connect_and_authenticate_with_proxy_command(
                 config_path,
                 &target_endpoint,
