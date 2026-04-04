@@ -46,6 +46,8 @@ struct Endpoint {
     host: String,
     port: u16,
     identity: Option<PathBuf>,
+    identity_source: &'static str,
+    user_source: &'static str,
 }
 
 #[derive(Clone, Debug)]
@@ -85,15 +87,46 @@ fn parse_proxy_jump(proxy_jump: &str) -> Result<Vec<JumpSpec>, String> {
         .collect()
 }
 
+fn resolve_identity(
+    host_config_identity: Option<PathBuf>,
+    cli_identity: Option<&PathBuf>,
+    host_config_source: &'static str,
+) -> (Option<PathBuf>, &'static str) {
+    if let Some(identity) = host_config_identity {
+        (Some(identity), host_config_source)
+    } else if let Some(identity) = cli_identity {
+        (Some(identity.clone()), "cli identity")
+    } else {
+        (None, "fallback")
+    }
+}
+
+fn resolve_user(
+    host_config_user: Option<String>,
+    inherited_user: &str,
+    explicit_user: Option<&str>,
+    host_config_source: &'static str,
+    explicit_source: &'static str,
+) -> (String, &'static str) {
+    if let Some(user) = explicit_user {
+        (user.to_string(), explicit_source)
+    } else if let Some(user) = host_config_user {
+        (user, host_config_source)
+    } else {
+        (inherited_user.to_string(), "inherited/default")
+    }
+}
+
 fn endpoint_from_jump_spec(
     spec: &JumpSpec,
     ssh_config: Option<&PathBuf>,
     default_user: &str,
+    cli_identity: Option<&PathBuf>,
 ) -> Result<Endpoint, String> {
     let mut host = spec.host.clone();
-    let mut user = default_user.to_string();
+    let mut host_config_user = None;
     let mut port = 22;
-    let mut identity = None;
+    let mut host_config_identity = None;
 
     if let Some(ssh_config) = ssh_config
         && ssh_config.exists()
@@ -104,26 +137,34 @@ fn endpoint_from_jump_spec(
         if !config_host.is_empty() {
             host = config_host.to_string();
         }
-        user = config.user();
+        host_config_user = config.host_config.user;
         port = config.port();
-        identity = config
+        host_config_identity = config
             .host_config
             .identity_file
             .and_then(|files| files.first().cloned());
     }
 
-    if let Some(spec_user) = &spec.user {
-        user = spec_user.clone();
-    }
+    let (user, user_source) = resolve_user(
+        host_config_user,
+        default_user,
+        spec.user.as_deref(),
+        "proxy host config",
+        "jump spec",
+    );
     if let Some(spec_port) = spec.port {
         port = spec_port;
     }
+    let (identity, identity_source) =
+        resolve_identity(host_config_identity, cli_identity, "proxy host config");
 
     Ok(Endpoint {
         user,
         host,
         port,
         identity,
+        identity_source,
+        user_source,
     })
 }
 
@@ -213,9 +254,14 @@ async fn connect_and_authenticate(
     password: Option<&str>,
 ) -> Result<client::Handle<SshHandler>, String> {
     let mut session = connect_direct(endpoint, timeout).await?;
+    debug!(
+        "Credentials for {}@{}:{} => user source: {}, identity source: {}",
+        endpoint.user, endpoint.host, endpoint.port, endpoint.user_source, endpoint.identity_source
+    );
     authenticate_all(
         &mut session,
         &endpoint.user,
+        &endpoint.host,
         password,
         endpoint.identity.as_ref(),
         timeout,
@@ -232,9 +278,14 @@ async fn connect_and_authenticate_with_proxy_command(
     password: Option<&str>,
 ) -> Result<client::Handle<SshHandler>, String> {
     let mut session = connect_with_proxy_command(ssh_config, endpoint, timeout).await?;
+    debug!(
+        "Credentials for {}@{}:{} => user source: {}, identity source: {}",
+        endpoint.user, endpoint.host, endpoint.port, endpoint.user_source, endpoint.identity_source
+    );
     authenticate_all(
         &mut session,
         &endpoint.user,
+        &endpoint.host,
         password,
         endpoint.identity.as_ref(),
         timeout,
@@ -251,9 +302,14 @@ async fn connect_and_authenticate_through_jump(
     password: Option<&str>,
 ) -> Result<client::Handle<SshHandler>, String> {
     let mut session = connect_through_jump(jump, endpoint, timeout).await?;
+    debug!(
+        "Credentials for {}@{}:{} => user source: {}, identity source: {}",
+        endpoint.user, endpoint.host, endpoint.port, endpoint.user_source, endpoint.identity_source
+    );
     authenticate_all(
         &mut session,
         &endpoint.user,
+        &endpoint.host,
         password,
         endpoint.identity.as_ref(),
         timeout,
@@ -289,6 +345,9 @@ async fn main() -> ExitCode {
 
     let mut proxy_jump = None;
     let mut proxy_command = None;
+    let mut target_identity_from_config = None;
+    let mut target_user_from_config = false;
+    let cli_identity = opts.identity.clone();
 
     // Respect the SSH configuration file if it exists
     if let Some(ssh_config) = &opts.config
@@ -305,6 +364,7 @@ async fn main() -> ExitCode {
         }
         if let Some(user) = config.host_config.user {
             opts.target.user = user;
+            target_user_from_config = true;
         }
         if let Some(port) = config.host_config.port {
             opts.target.port = port;
@@ -314,7 +374,7 @@ async fn main() -> ExitCode {
             .identity_file
             .and_then(|files| files.first().cloned())
         {
-            opts.identity = Some(identity);
+            target_identity_from_config = Some(identity);
         }
         proxy_jump = config.host_config.proxy_jump;
         proxy_command = config.host_config.proxy_command;
@@ -325,11 +385,20 @@ async fn main() -> ExitCode {
     debug!("Host: {}", opts.target.host);
     debug!("Port: {}", opts.target.port);
 
+    let (target_identity, target_identity_source) =
+        resolve_identity(target_identity_from_config, cli_identity.as_ref(), "target host config");
+    let target_user_source = if target_user_from_config {
+        "target host config"
+    } else {
+        "target/default"
+    };
     let target_endpoint = Endpoint {
         user: opts.target.user.clone(),
         host: opts.target.host.clone(),
         port: opts.target.port,
-        identity: opts.identity.clone(),
+        identity: target_identity,
+        identity_source: target_identity_source,
+        user_source: target_user_source,
     };
 
     let connect_start = Instant::now();
@@ -362,6 +431,7 @@ async fn main() -> ExitCode {
                 jumps.first().expect("non-empty jumps"),
                 opts.config.as_ref(),
                 default_user.as_str(),
+                cli_identity.as_ref(),
             ) {
                 Ok(endpoint) => endpoint,
                 Err(e) => {
@@ -385,14 +455,18 @@ async fn main() -> ExitCode {
             jump_sessions.push(first_session);
 
             for jump_spec in jumps.iter().skip(1) {
-                let endpoint =
-                    match endpoint_from_jump_spec(jump_spec, opts.config.as_ref(), default_user.as_str()) {
-                        Ok(endpoint) => endpoint,
-                        Err(e) => {
-                            error!("{e}");
-                            return ExitCode::FAILURE;
-                        }
-                    };
+                let endpoint = match endpoint_from_jump_spec(
+                    jump_spec,
+                    opts.config.as_ref(),
+                    default_user.as_str(),
+                    cli_identity.as_ref(),
+                ) {
+                    Ok(endpoint) => endpoint,
+                    Err(e) => {
+                        error!("{e}");
+                        return ExitCode::FAILURE;
+                    }
+                };
                 let jump_session = match connect_and_authenticate_through_jump(
                     jump_sessions.last_mut().expect("at least one jump session"),
                     &endpoint,
@@ -557,4 +631,62 @@ async fn main() -> ExitCode {
 
     // Exit successfully
     ExitCode::SUCCESS
+}
+
+#[cfg(test)]
+mod auth_resolution_tests {
+    use super::{resolve_identity, resolve_user};
+    use std::path::PathBuf;
+
+    #[test]
+    fn identity_prefers_host_config_then_cli_then_fallback() {
+        let host_cfg = PathBuf::from("/tmp/proxy_key");
+        let cli = PathBuf::from("/tmp/cli_key");
+
+        let (identity, source) =
+            resolve_identity(Some(host_cfg.clone()), Some(&cli), "proxy host config");
+        assert_eq!(identity, Some(host_cfg));
+        assert_eq!(source, "proxy host config");
+
+        let (identity, source) = resolve_identity(None, Some(&cli), "proxy host config");
+        assert_eq!(identity, Some(cli));
+        assert_eq!(source, "cli identity");
+
+        let (identity, source) = resolve_identity(None, None, "proxy host config");
+        assert_eq!(identity, None);
+        assert_eq!(source, "fallback");
+    }
+
+    #[test]
+    fn user_prefers_explicit_then_host_config_then_inherited() {
+        let (user, source) = resolve_user(
+            Some("cfg-user".to_string()),
+            "default-user",
+            Some("jump-user"),
+            "proxy host config",
+            "jump spec",
+        );
+        assert_eq!(user, "jump-user");
+        assert_eq!(source, "jump spec");
+
+        let (user, source) = resolve_user(
+            Some("cfg-user".to_string()),
+            "default-user",
+            None,
+            "proxy host config",
+            "jump spec",
+        );
+        assert_eq!(user, "cfg-user");
+        assert_eq!(source, "proxy host config");
+
+        let (user, source) = resolve_user(
+            None,
+            "default-user",
+            None,
+            "proxy host config",
+            "jump spec",
+        );
+        assert_eq!(user, "default-user");
+        assert_eq!(source, "inherited/default");
+    }
 }
