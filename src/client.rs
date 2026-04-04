@@ -219,10 +219,8 @@ fn build_route(
             Route::ProxyJump(hops)
         });
     }
-    if proxy_command.is_some() && ssh_config.is_some_and(|cfg| cfg.exists()) {
-        return Ok(Route::ProxyCommand(
-            ssh_config.expect("checked exists").clone(),
-        ));
+    if let (Some(_), Some(cfg)) = (proxy_command, ssh_config.filter(|cfg| cfg.exists())) {
+        return Ok(Route::ProxyCommand(cfg.clone()));
     }
     Ok(Route::Direct)
 }
