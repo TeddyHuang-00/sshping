@@ -6,7 +6,7 @@ mod util;
 
 use std::{
     io::Read,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::ExitCode,
     sync::Arc,
     time::Instant,
@@ -16,7 +16,7 @@ use auth::authenticate_all;
 use clap::Parser;
 use cli::{Options, Test};
 use log::{debug, error, trace, LevelFilter};
-use russh::{ChannelMsg, client};
+use russh::client;
 use simple_logger::SimpleLogger;
 use russh_config::parse_path;
 use summary::Record;
@@ -85,67 +85,6 @@ fn parse_proxy_jump(proxy_jump: &str) -> Result<Vec<JumpSpec>, String> {
         .collect()
 }
 
-fn wildcard_pattern_match_recursive(host: &[u8], pattern: &[u8]) -> bool {
-    if pattern.is_empty() {
-        return host.is_empty();
-    }
-    match pattern[0] {
-        b'*' => {
-            wildcard_pattern_match_recursive(host, &pattern[1..])
-                || (!host.is_empty() && wildcard_pattern_match_recursive(&host[1..], pattern))
-        }
-        b'?' => !host.is_empty() && wildcard_pattern_match_recursive(&host[1..], &pattern[1..]),
-        c => !host.is_empty() && host[0] == c && wildcard_pattern_match_recursive(&host[1..], &pattern[1..]),
-    }
-}
-
-fn wildcard_pattern_match(host: &str, pattern: &str) -> bool {
-    wildcard_pattern_match_recursive(host.as_bytes(), pattern.as_bytes())
-}
-
-fn host_patterns_match(host: &str, patterns: &str) -> bool {
-    let mut matched = false;
-    for pattern in patterns.split_ascii_whitespace() {
-        if pattern.is_empty() {
-            continue;
-        }
-        if let Some(negated) = pattern.strip_prefix('!') {
-            if wildcard_pattern_match(host, negated) {
-                return false;
-            }
-        } else if wildcard_pattern_match(host, pattern) {
-            matched = true;
-        }
-    }
-    matched
-}
-
-fn parse_remote_command(ssh_config: &Path, host: &str) -> Option<String> {
-    let content = std::fs::read_to_string(ssh_config).ok()?;
-    let mut current_host_matches = false;
-    let mut remote_command: Option<String> = None;
-    for line in content.lines().map(str::trim) {
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        let mut parts = line.splitn(2, char::is_whitespace);
-        let key = parts.next().unwrap_or("");
-        let value = parts.next().unwrap_or("").trim_start();
-        if key.eq_ignore_ascii_case("host") {
-            current_host_matches = host_patterns_match(host, value);
-            continue;
-        }
-        if key.eq_ignore_ascii_case("remotecommand")
-            && current_host_matches
-            && remote_command.is_none()
-            && !value.is_empty()
-        {
-            remote_command = Some(value.to_string());
-        }
-    }
-    remote_command
-}
-
 fn endpoint_from_jump_spec(
     spec: &JumpSpec,
     ssh_config: Option<&PathBuf>,
@@ -209,6 +148,39 @@ async fn connect_direct(
     }
 }
 
+async fn connect_with_proxy_command(
+    ssh_config: &PathBuf,
+    endpoint: &Endpoint,
+    timeout: f64,
+) -> Result<client::Handle<SshHandler>, String> {
+    let parsed = parse_path(ssh_config, endpoint.host.as_str())
+        .map_err(|e| format!("Failed to parse SSH config for ProxyCommand: {e}"))?;
+    let stream = parsed
+        .stream()
+        .await
+        .map_err(|e| format!("Failed to connect through ProxyCommand: {e}"))?;
+    let config = Arc::new(client::Config {
+        inactivity_timeout: Some(std::time::Duration::from_secs_f64(timeout)),
+        ..Default::default()
+    });
+    match tokio::time::timeout(
+        std::time::Duration::from_secs_f64(timeout),
+        client::connect_stream(config, stream, SshHandler),
+    )
+    .await
+    {
+        Ok(Ok(session)) => Ok(session),
+        Ok(Err(e)) => Err(format!(
+            "Failed to establish stream connection through ProxyCommand to {}: {e}",
+            endpoint.host
+        )),
+        Err(_) => Err(format!(
+            "Connection timeout when stream-connecting through ProxyCommand to {}",
+            endpoint.host
+        )),
+    }
+}
+
 async fn connect_through_jump(
     jump: &mut client::Handle<SshHandler>,
     endpoint: &Endpoint,
@@ -253,6 +225,25 @@ async fn connect_and_authenticate(
     Ok(session)
 }
 
+async fn connect_and_authenticate_with_proxy_command(
+    ssh_config: &PathBuf,
+    endpoint: &Endpoint,
+    timeout: f64,
+    password: Option<&str>,
+) -> Result<client::Handle<SshHandler>, String> {
+    let mut session = connect_with_proxy_command(ssh_config, endpoint, timeout).await?;
+    authenticate_all(
+        &mut session,
+        &endpoint.user,
+        password,
+        endpoint.identity.as_ref(),
+        timeout,
+    )
+    .await
+    .map_err(ToString::to_string)?;
+    Ok(session)
+}
+
 async fn connect_and_authenticate_through_jump(
     jump: &mut client::Handle<SshHandler>,
     endpoint: &Endpoint,
@@ -270,47 +261,6 @@ async fn connect_and_authenticate_through_jump(
     .await
     .map_err(ToString::to_string)?;
     Ok(session)
-}
-
-async fn execute_remote_command(
-    session: &mut client::Handle<SshHandler>,
-    command: &str,
-    timeout: f64,
-) -> Result<(), String> {
-    debug!("Executing RemoteCommand: {command}");
-    let mut channel = session
-        .channel_open_session()
-        .await
-        .map_err(|e| format!("Failed to open session channel for RemoteCommand: {e}"))?;
-    channel
-        .exec(false, command.as_bytes())
-        .await
-        .map_err(|e| format!("Failed to execute RemoteCommand: {e}"))?;
-
-    let timeout_duration = std::time::Duration::from_secs_f64(timeout);
-    let mut exit_status = None;
-    loop {
-        match tokio::time::timeout(timeout_duration, channel.wait()).await {
-            Ok(Some(ChannelMsg::ExitStatus { exit_status: status })) => {
-                exit_status = Some(status);
-            }
-            Ok(Some(ChannelMsg::Close)) | Ok(None) => break,
-            Ok(Some(ChannelMsg::Eof)) => {}
-            Ok(Some(_)) => {}
-            Err(_) => {
-                return Err(format!(
-                    "Timed out waiting for RemoteCommand completion after {timeout} seconds"
-                ));
-            }
-        }
-    }
-
-    if let Some(status) = exit_status
-        && status != 0
-    {
-        return Err(format!("RemoteCommand exited with status {status}"));
-    }
-    Ok(())
 }
 
 #[tokio::main]
@@ -338,8 +288,7 @@ async fn main() -> ExitCode {
     let formatter = Formatter::new(opts.human_readable, opts.delimiter);
 
     let mut proxy_jump = None;
-    let mut remote_command = None;
-    let original_target_host = opts.target.host.clone();
+    let mut proxy_command = None;
 
     // Respect the SSH configuration file if it exists
     if let Some(ssh_config) = &opts.config
@@ -368,7 +317,7 @@ async fn main() -> ExitCode {
             opts.identity = Some(identity);
         }
         proxy_jump = config.host_config.proxy_jump;
-        remote_command = parse_remote_command(ssh_config, original_target_host.as_str());
+        proxy_command = config.host_config.proxy_command;
     }
 
     trace!("Options: {:?}", opts);
@@ -489,22 +438,36 @@ async fn main() -> ExitCode {
             }
         }
     } else {
-        match connect_and_authenticate(&target_endpoint, opts.ssh_timeout, opts.password.as_deref()).await {
-            Ok(session) => session,
-            Err(e) => {
-                error!("Failed to connect to target: {e}");
+        if proxy_command.is_some() && opts.config.as_ref().is_some_and(|c| c.exists()) {
+            let Some(config_path) = opts.config.as_ref() else {
+                error!("SSH config path is unavailable for ProxyCommand");
                 return ExitCode::FAILURE;
+            };
+            match connect_and_authenticate_with_proxy_command(
+                config_path,
+                &target_endpoint,
+                opts.ssh_timeout,
+                opts.password.as_deref(),
+            )
+            .await
+            {
+                Ok(session) => session,
+                Err(e) => {
+                    error!("Failed to connect to target through ProxyCommand: {e}");
+                    return ExitCode::FAILURE;
+                }
+            }
+        } else {
+            match connect_and_authenticate(&target_endpoint, opts.ssh_timeout, opts.password.as_deref()).await {
+                Ok(session) => session,
+                Err(e) => {
+                    error!("Failed to connect to target: {e}");
+                    return ExitCode::FAILURE;
+                }
             }
         }
     };
     let ssh_connect_time = connect_start.elapsed();
-
-    if let Some(command) = remote_command
-        && let Err(e) = execute_remote_command(&mut session, command.as_str(), opts.ssh_timeout).await
-    {
-        error!("Failed to execute RemoteCommand: {e}");
-        return ExitCode::FAILURE;
-    }
 
     // Running tests
     let echo_test_result = if opts.run_tests == Test::Echo || opts.run_tests == Test::Both {
