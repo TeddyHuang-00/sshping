@@ -2,24 +2,98 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [0.3.1] - 2026-04-04
 
 ### 🚀 Features
 
-- Migrate from ssh2 to russh for SSH operations
-  - Replace ssh2 with russh (pure Rust SSH implementation)
-  - Add async/await support with tokio runtime
-  - Update all SSH operations to be asynchronous
-  - Use russh-sftp for file transfer operations
+- Add runtime completion engine
 
-### ⚠️ Breaking Changes
+### 🐛 Bug Fixes
 
-- SSH agent authentication is no longer supported in this version
-- Minimum Rust version may have changed due to async runtime requirements
+- Stabilize echo test by removing PTY/shell dependency and hardening channel byte handling (#197)
 
-### 📚 Documentation
+### 🎨 Styling
 
-- Update FAQ to reflect removal of SSH agent authentication support
+- Use inclusive slice
+
+### ⚙️ Miscellaneous Tasks
+
+- Pin changelog action version to latest 1.10.3
+
+## [0.3.0] - 2026-04-04
+
+### 🚀 Features
+
+- Add SSH config `ProxyJump` + `ProxyCommand` support via multi-hop authenticated sessions (#194)
+
+### 🐛 Bug Fixes
+
+- [**breaking**] Migrate SSH config resolution from `ssh2-config` to `russh-config` (#193)
+- *(deps)* Update rust crate whoami to 2.1.1
+- Fix code format and linting errors
+- Harden summary parsing and test flow edge cases
+- Exclude data generation time from speed transfer timing
+- Remove redundant type conversion
+
+### 🚜 Refactor
+
+- Harden parsing auth tests and docs for strict quality pass
+- Use invariant let-else for guaranteed span conversion
+
+### ⚙️ Miscellaneous Tasks
+
+- Add format and lint check in CI workflow
+- Add config for clippy
+- Rename workflow
+- Continue strict refactor implementation
+- Address code review follow-ups
+- Bump version to 0.3.0
+
+## [0.2.4] - 2026-04-04
+
+### 🐛 Bug Fixes
+
+- *(deps)* Update rust crate russh to 0.56.0 (#155)
+- *(deps)* Update rust crate russh to 0.57.0 (#168)
+- *(deps)* Update rust crate whoami to v2 (#162)
+- *(deps)* Update rust crate ssh2-config to 0.7.0 (#172)
+- *(deps)* Update rust crate russh to 0.58.0 (#188)
+- *(deps)* Update rust crate russh to 0.59.0 (#190)
+- *(deps)* Update rust crate russh to 0.60.0 (#192)
+- *(deps)* Update rust crate rand to 0.10.0 (#175)
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 0.2.3
+- Bump version to 0.2.4
+
+## [0.2.3] - 2025-12-18
+
+### 🚀 Features
+
+- Add interactive password/passphrase prompts for SSH authentication (#140)
+
+### 🐛 Bug Fixes
+
+- *(deps)* Update rust crate clap to v4.5.47 (#111)
+- *(deps)* Update rust crate log to v0.4.28 (#112)
+- *(deps)* Update rust crate humantime to v2.3.0 (#114)
+- *(deps)* Update rust crate serde to v1.0.221 (#115)
+- *(deps)* Update rust crate serde_json to v1.0.144 (#116)
+- *(deps)* Update rust crate serde_json to v1.0.145 (#117)
+- *(deps)* Update rust crate serde to v1.0.223 (#118)
+- *(deps)* Update rust crate bytesize to v2.1.0 (#119)
+- *(deps)* Update rust crate serde to v1.0.225 (#121)
+- *(deps)* Update rust crate clap to v4.5.48 (#122)
+- *(deps)* Update rust crate serde to v1.0.226 (#123)
+- *(deps)* Update rust crate russh to 0.55.0 (#150)
+- Fixes #152 Gracefully handle cases where ssh config doesn't exist
+
+### ⚙️ Miscellaneous Tasks
+
+- Migrate from ssh2 to russh (#136)
+- Clean up empty feature
+- Update macos runner images
 
 ## [0.2.2] - 2025-08-27
 
