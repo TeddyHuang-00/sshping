@@ -171,7 +171,7 @@ pub struct Options {
         short,
         long,
         value_name = "CMD",
-        default_value = "cat > /dev/null",
+        default_value = "cat",
         value_hint = ValueHint::CommandString
     )]
     pub echo_cmd: String,
