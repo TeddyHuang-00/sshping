@@ -59,10 +59,9 @@ async fn main() -> ExitCode {
     };
 
     trace!("Options: {:?}", opts);
-    let target = &opts.target;
-    debug!("User: {}", target.user);
-    debug!("Host: {}", target.host);
-    debug!("Port: {}", target.port);
+    debug!("User: {}", opts.target.user);
+    debug!("Host: {}", opts.target.host);
+    debug!("Port: {}", opts.target.port);
 
     let connect_start = Instant::now();
     let session = match connect_plan(&plan, opts.ssh_timeout, opts.password.as_deref()).await {
