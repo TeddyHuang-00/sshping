@@ -137,17 +137,14 @@ pub async fn run_echo_test<H: client::Handler>(
 
         // Wait for echo back
         loop {
-            if let Some(pos) = pending_data.iter().position(|byte| *byte == byte_slice[0]) {
-                pending_data.drain(..=pos);
+            if pending_data.pop_front().is_some() {
                 break;
             }
 
             if let Some(msg) = channel.wait().await {
                 match msg {
                     ChannelMsg::Data { data } => {
-                        for byte in data.as_ref().iter().copied() {
-                            pending_data.push_back(byte);
-                        }
+                        pending_data.extend(data.as_ref().iter().copied());
                     }
                     ChannelMsg::Eof => {
                         return Err(TestError::ChannelClosed);
