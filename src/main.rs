@@ -71,17 +71,22 @@ async fn main() -> ExitCode {
             .expect("Failed to parse configuration");
 
         // Update options with configuration
-        opts.target.host = config.host().to_string();
+        let config_host = config.host();
+        if !config_host.is_empty() {
+            opts.target.host = config_host.to_string();
+        }
         if let Some(user) = config.host_config.user {
             opts.target.user = user;
         }
         if let Some(port) = config.host_config.port {
             opts.target.port = port;
         }
-        if let Some(identity_files) = config.host_config.identity_file
-            && let Some(identity) = identity_files.first()
+        if let Some(identity) = config
+            .host_config
+            .identity_file
+            .and_then(|files| files.first().cloned())
         {
-            opts.identity = Some(identity.to_owned());
+            opts.identity = Some(identity);
         }
     }
 
