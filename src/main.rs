@@ -8,7 +8,7 @@ mod util;
 use std::{io::Read, process::ExitCode, time::Instant};
 
 use clap::Parser;
-use client::{establish_authenticated_session, resolve_target_and_proxies};
+use client::{build_connection_plan, connect_plan};
 use cli::{Options, Test};
 use log::{debug, error, trace, LevelFilter};
 use simple_logger::SimpleLogger;
@@ -44,9 +44,8 @@ async fn main() -> ExitCode {
     // Get the formatter for output
     let formatter = Formatter::new(opts.human_readable, opts.delimiter);
 
-    let cli_identity = opts.identity.clone();
-    let resolved = match resolve_target_and_proxies(&mut opts) {
-        Ok(resolved) => resolved,
+    let plan = match build_connection_plan(&mut opts) {
+        Ok(plan) => plan,
         Err(e) => {
             error!("{e}");
             return ExitCode::FAILURE;
@@ -59,15 +58,7 @@ async fn main() -> ExitCode {
     debug!("Port: {}", opts.target.port);
 
     let connect_start = Instant::now();
-    let mut session = match establish_authenticated_session(
-        &resolved,
-        opts.config.as_ref(),
-        opts.ssh_timeout,
-        opts.password.as_deref(),
-        cli_identity.as_ref(),
-    )
-    .await
-    {
+    let mut session = match connect_plan(&plan, opts.ssh_timeout, opts.password.as_deref()).await {
         Ok(session) => session,
         Err(e) => {
             error!("Failed to connect/authenticate: {e}");

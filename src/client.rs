@@ -1,10 +1,12 @@
-use std::{path::PathBuf, sync::Arc};
+use std::{fmt, path::PathBuf, sync::Arc, time::Duration};
 
 use log::debug;
 use russh::client;
 use russh_config::parse_path;
 
 use crate::{auth::authenticate_all, cli::Options};
+
+type Result<T> = std::result::Result<T, ClientError>;
 
 pub struct SshHandler;
 
@@ -14,20 +16,121 @@ impl client::Handler for SshHandler {
     async fn check_server_key(
         &mut self,
         _server_public_key: &russh::keys::ssh_key::PublicKey,
-    ) -> Result<bool, Self::Error> {
+    ) -> std::result::Result<bool, Self::Error> {
         Ok(true)
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum Source {
+    TargetHostConfig,
+    ProxyHostConfig,
+    CliIdentity,
+    JumpSpec,
+    TargetDefault,
+    InheritedDefault,
+    Fallback,
+}
+
+impl Source {
+    fn as_str(self) -> &'static str {
+        match self {
+            Source::TargetHostConfig => "target host config",
+            Source::ProxyHostConfig => "proxy host config",
+            Source::CliIdentity => "cli identity",
+            Source::JumpSpec => "jump spec",
+            Source::TargetDefault => "target/default",
+            Source::InheritedDefault => "inherited/default",
+            Source::Fallback => "fallback",
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct AuthSpec {
+    pub user: String,
+    pub identity: Option<PathBuf>,
+    pub user_source: Source,
+    pub identity_source: Source,
+}
+
 #[derive(Clone, Debug)]
 pub struct Endpoint {
-    pub user: String,
     pub host: String,
     pub port: u16,
-    pub identity: Option<PathBuf>,
-    pub identity_source: &'static str,
-    pub user_source: &'static str,
+    pub auth: AuthSpec,
 }
+
+impl Endpoint {
+    async fn authenticate(
+        &self,
+        mut session: client::Handle<SshHandler>,
+        password: Option<&str>,
+        timeout: f64,
+    ) -> Result<client::Handle<SshHandler>> {
+        debug!(
+            "Credentials for {}@{}:{} => user source: {}, identity source: {}",
+            self.auth.user,
+            self.host,
+            self.port,
+            self.auth.user_source.as_str(),
+            self.auth.identity_source.as_str()
+        );
+        authenticate_all(
+            &mut session,
+            &self.auth.user,
+            &self.host,
+            password,
+            self.auth.identity.as_ref(),
+            timeout,
+        )
+        .await
+        .map_err(|e| ClientError::Auth(e.to_string()))?;
+        Ok(session)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub enum Route {
+    Direct,
+    ProxyCommand(PathBuf),
+    ProxyJump(Vec<Endpoint>),
+}
+
+#[derive(Clone, Debug)]
+pub struct ConnectionPlan {
+    pub target: Endpoint,
+    pub route: Route,
+}
+
+#[derive(Debug)]
+pub enum ClientError {
+    ConfigParse { context: &'static str, source: String },
+    InvalidProxyJump(String),
+    Connect { host: String, source: String },
+    Timeout { context: &'static str, host: String },
+    Auth(String),
+    Route(String),
+}
+
+impl fmt::Display for ClientError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ClientError::ConfigParse { context, source } => {
+                write!(f, "Failed to parse {context}: {source}")
+            }
+            ClientError::InvalidProxyJump(msg) => write!(f, "{msg}"),
+            ClientError::Connect { host, source } => write!(f, "Failed to connect to {host}: {source}"),
+            ClientError::Timeout { context, host } => {
+                write!(f, "Connection timeout when {context} {host}")
+            }
+            ClientError::Auth(msg) => write!(f, "{msg}"),
+            ClientError::Route(msg) => write!(f, "{msg}"),
+        }
+    }
+}
+
+impl std::error::Error for ClientError {}
 
 #[derive(Clone, Debug)]
 struct JumpSpec {
@@ -36,24 +139,142 @@ struct JumpSpec {
     port: Option<u16>,
 }
 
-#[derive(Clone, Debug)]
-pub struct ResolvedConnection {
-    pub target_endpoint: Endpoint,
-    pub proxy_jump: Option<String>,
-    pub proxy_command: Option<String>,
+pub fn build_connection_plan(opts: &mut Options) -> Result<ConnectionPlan> {
+    let cli_identity = opts.identity.clone();
+    let mut proxy_jump = None;
+    let mut proxy_command = None;
+    let mut target_user_source = Source::TargetDefault;
+    let mut target_identity_from_config = None;
+
+    if let Some(ssh_config) = &opts.config
+        && ssh_config.exists()
+    {
+        debug!("SSH Config: {:?}", ssh_config);
+        let config = parse_path(ssh_config, opts.target.host.as_str()).map_err(|e| {
+            ClientError::ConfigParse {
+                context: "configuration",
+                source: e.to_string(),
+            }
+        })?;
+        if !config.host().is_empty() {
+            opts.target.host = config.host().to_string();
+        }
+        if let Some(user) = config.host_config.user {
+            opts.target.user = user;
+            target_user_source = Source::TargetHostConfig;
+        }
+        if let Some(port) = config.host_config.port {
+            opts.target.port = port;
+        }
+        target_identity_from_config = config
+            .host_config
+            .identity_file
+            .and_then(|files| files.first().cloned());
+        proxy_jump = config.host_config.proxy_jump;
+        proxy_command = config.host_config.proxy_command;
+    }
+
+    let target_identity = resolve_identity(
+        target_identity_from_config,
+        cli_identity.as_ref(),
+        Source::TargetHostConfig,
+    );
+    let target = Endpoint {
+        host: opts.target.host.clone(),
+        port: opts.target.port,
+        auth: AuthSpec {
+            user: opts.target.user.clone(),
+            identity: target_identity.0,
+            identity_source: target_identity.1,
+            user_source: target_user_source,
+        },
+    };
+
+    let route = build_route(
+        proxy_jump.as_deref(),
+        proxy_command.as_deref(),
+        opts.config.as_ref(),
+        &target.auth.user,
+        cli_identity.as_ref(),
+    )?;
+
+    Ok(ConnectionPlan { target, route })
+}
+
+fn build_route(
+    proxy_jump: Option<&str>,
+    proxy_command: Option<&str>,
+    ssh_config: Option<&PathBuf>,
+    default_user: &str,
+    cli_identity: Option<&PathBuf>,
+) -> Result<Route> {
+    if let Some(proxy_jump) = proxy_jump {
+        let hops = parse_proxy_jump(proxy_jump)?
+            .into_iter()
+            .map(|spec| resolve_jump_endpoint(&spec, ssh_config, default_user, cli_identity))
+            .collect::<Result<Vec<_>>>()?;
+        return Ok(if hops.is_empty() {
+            Route::Direct
+        } else {
+            Route::ProxyJump(hops)
+        });
+    }
+    if proxy_command.is_some() && ssh_config.is_some_and(|cfg| cfg.exists()) {
+        return Ok(Route::ProxyCommand(
+            ssh_config.expect("checked exists").clone(),
+        ));
+    }
+    Ok(Route::Direct)
+}
+
+pub async fn connect_plan(
+    plan: &ConnectionPlan,
+    timeout: f64,
+    password: Option<&str>,
+) -> Result<client::Handle<SshHandler>> {
+    match &plan.route {
+        Route::Direct => {
+            let session = connect_via(Transport::Direct(&plan.target), timeout).await?;
+            plan.target.authenticate(session, password, timeout).await
+        }
+        Route::ProxyCommand(ssh_config) => {
+            let session =
+                connect_via(Transport::ProxyCommand(ssh_config, &plan.target), timeout).await?;
+            plan.target.authenticate(session, password, timeout).await
+        }
+        Route::ProxyJump(hops) => {
+            let mut iter = hops.iter();
+            let first = iter
+                .next()
+                .ok_or_else(|| ClientError::Route("ProxyJump route unexpectedly empty".to_string()))?;
+            let mut upstream = first
+                .authenticate(connect_via(Transport::Direct(first), timeout).await?, password, timeout)
+                .await?;
+
+            for hop in iter {
+                let session =
+                    connect_via(Transport::Jump(&mut upstream, hop), timeout).await?;
+                upstream = hop.authenticate(session, password, timeout).await?;
+            }
+
+            let target_session =
+                connect_via(Transport::Jump(&mut upstream, &plan.target), timeout).await?;
+            plan.target.authenticate(target_session, password, timeout).await
+        }
+    }
 }
 
 pub fn resolve_identity(
     host_config_identity: Option<PathBuf>,
     cli_identity: Option<&PathBuf>,
-    host_config_source: &'static str,
-) -> (Option<PathBuf>, &'static str) {
+    host_config_source: Source,
+) -> (Option<PathBuf>, Source) {
     if let Some(identity) = host_config_identity {
         (Some(identity), host_config_source)
     } else if let Some(identity) = cli_identity {
-        (Some(identity.clone()), "cli identity")
+        (Some(identity.clone()), Source::CliIdentity)
     } else {
-        (None, "fallback")
+        (None, Source::Fallback)
     }
 }
 
@@ -61,250 +282,24 @@ pub fn resolve_user(
     host_config_user: Option<String>,
     inherited_user: &str,
     explicit_user: Option<&str>,
-    host_config_source: &'static str,
-    explicit_source: &'static str,
-) -> (String, &'static str) {
+    host_config_source: Source,
+    explicit_source: Source,
+) -> (String, Source) {
     if let Some(user) = explicit_user {
         (user.to_string(), explicit_source)
     } else if let Some(user) = host_config_user {
         (user, host_config_source)
     } else {
-        (inherited_user.to_string(), "inherited/default")
+        (inherited_user.to_string(), Source::InheritedDefault)
     }
 }
 
-pub fn resolve_target_and_proxies(opts: &mut Options) -> Result<ResolvedConnection, String> {
-    let mut proxy_jump = None;
-    let mut proxy_command = None;
-    let mut target_identity_from_config = None;
-    let mut target_user_from_config = false;
-    let cli_identity = opts.identity.clone();
-
-    if let Some(ssh_config) = &opts.config
-        && ssh_config.exists()
-    {
-        debug!("SSH Config: {:?}", ssh_config);
-        let config = parse_path(ssh_config, opts.target.host.as_str())
-            .map_err(|e| format!("Failed to parse configuration: {e}"))?;
-
-        let config_host = config.host();
-        if !config_host.is_empty() {
-            opts.target.host = config_host.to_string();
-        }
-        if let Some(user) = config.host_config.user {
-            opts.target.user = user;
-            target_user_from_config = true;
-        }
-        if let Some(port) = config.host_config.port {
-            opts.target.port = port;
-        }
-        if let Some(identity) = config
-            .host_config
-            .identity_file
-            .and_then(|files| files.first().cloned())
-        {
-            target_identity_from_config = Some(identity);
-        }
-        proxy_jump = config.host_config.proxy_jump;
-        proxy_command = config.host_config.proxy_command;
-    }
-
-    let (target_identity, target_identity_source) =
-        resolve_identity(target_identity_from_config, cli_identity.as_ref(), "target host config");
-    let target_user_source = if target_user_from_config {
-        "target host config"
-    } else {
-        "target/default"
-    };
-    let target_endpoint = Endpoint {
-        user: opts.target.user.clone(),
-        host: opts.target.host.clone(),
-        port: opts.target.port,
-        identity: target_identity,
-        identity_source: target_identity_source,
-        user_source: target_user_source,
-    };
-
-    Ok(ResolvedConnection {
-        target_endpoint,
-        proxy_jump,
-        proxy_command,
-    })
-}
-
-pub async fn establish_authenticated_session(
-    resolved: &ResolvedConnection,
-    ssh_config: Option<&PathBuf>,
-    timeout: f64,
-    password: Option<&str>,
-    cli_identity: Option<&PathBuf>,
-) -> Result<client::Handle<SshHandler>, String> {
-    let connector = SessionConnector::new(timeout, password);
-
-    if let Some(proxy_jump) = &resolved.proxy_jump {
-        let jumps = parse_proxy_jump(proxy_jump.as_str())?;
-        if jumps.is_empty() {
-            return connector
-                .connect_direct_auth(&resolved.target_endpoint)
-                .await;
-        }
-
-        let default_user = resolved.target_endpoint.user.clone();
-        let first_jump = endpoint_from_jump_spec(
-            jumps.first().ok_or("ProxyJump list became empty unexpectedly")?,
-            ssh_config,
-            default_user.as_str(),
-            cli_identity,
-        )?;
-        let first_session = connector.connect_direct_auth(&first_jump).await?;
-        let mut jump_sessions: Vec<client::Handle<SshHandler>> = vec![first_session];
-
-        for jump_spec in jumps.iter().skip(1) {
-            let endpoint =
-                endpoint_from_jump_spec(jump_spec, ssh_config, default_user.as_str(), cli_identity)?;
-            let Some(last_jump) = jump_sessions.last_mut() else {
-                return Err("No jump session available while establishing ProxyJump chain".to_string());
-            };
-            let jump_session = connector
-                .connect_through_jump_auth(last_jump, &endpoint)
-                .await?;
-            jump_sessions.push(jump_session);
-        }
-
-        let Some(last_jump) = jump_sessions.last_mut() else {
-            return Err("No jump session available for final target connection".to_string());
-        };
-        return connector
-            .connect_through_jump_auth(last_jump, &resolved.target_endpoint)
-            .await;
-    }
-
-    if resolved.proxy_command.is_some() && ssh_config.is_some_and(|c| c.exists()) {
-        return connector
-            .connect_proxy_command_auth(
-                ssh_config.expect("checked exists"),
-                &resolved.target_endpoint,
-            )
-            .await;
-    }
-
-    connector
-        .connect_direct_auth(&resolved.target_endpoint)
-        .await
-}
-
-struct SessionConnector<'a> {
-    timeout: f64,
-    password: Option<&'a str>,
-}
-
-impl<'a> SessionConnector<'a> {
-    fn new(timeout: f64, password: Option<&'a str>) -> Self {
-        Self { timeout, password }
-    }
-
-    async fn authenticate_connected(
-        &self,
-        endpoint: &Endpoint,
-        mut session: client::Handle<SshHandler>,
-    ) -> Result<client::Handle<SshHandler>, String> {
-        debug!(
-            "Credentials for {}@{}:{} => user source: {}, identity source: {}",
-            endpoint.user, endpoint.host, endpoint.port, endpoint.user_source, endpoint.identity_source
-        );
-        authenticate_all(
-            &mut session,
-            &endpoint.user,
-            &endpoint.host,
-            self.password,
-            endpoint.identity.as_ref(),
-            self.timeout,
-        )
-        .await
-        .map_err(ToString::to_string)?;
-        Ok(session)
-    }
-
-    async fn connect_direct_auth(&self, endpoint: &Endpoint) -> Result<client::Handle<SshHandler>, String> {
-        let session = connect_direct(endpoint, self.timeout).await?;
-        self.authenticate_connected(endpoint, session).await
-    }
-
-    async fn connect_proxy_command_auth(
-        &self,
-        ssh_config: &PathBuf,
-        endpoint: &Endpoint,
-    ) -> Result<client::Handle<SshHandler>, String> {
-        let session = connect_with_proxy_command(ssh_config, endpoint, self.timeout).await?;
-        self.authenticate_connected(endpoint, session).await
-    }
-
-    async fn connect_through_jump_auth(
-        &self,
-        jump: &mut client::Handle<SshHandler>,
-        endpoint: &Endpoint,
-    ) -> Result<client::Handle<SshHandler>, String> {
-        let session = connect_through_jump(jump, endpoint, self.timeout).await?;
-        self.authenticate_connected(endpoint, session).await
-    }
-}
-
-fn parse_proxy_jump(proxy_jump: &str) -> Result<Vec<JumpSpec>, String> {
-    proxy_jump
-        .split(',')
-        .map(str::trim)
-        .filter(|item| !item.is_empty() && !item.eq_ignore_ascii_case("none"))
-        .map(|item| {
-            let (user, host_port) = if let Some((user, host_port)) = item.rsplit_once('@') {
-                if user.is_empty() {
-                    return Err(format!("Invalid ProxyJump user in target: {item}"));
-                }
-                (Some(user.to_string()), host_port)
-            } else {
-                (None, item)
-            };
-            let (host, port) = if host_port.starts_with('[') {
-                let close = host_port
-                    .find(']')
-                    .ok_or_else(|| format!("Invalid bracketed ProxyJump host: {item}"))?;
-                let host = &host_port[1..close];
-                let rest = &host_port[close + 1..];
-                let port = if rest.is_empty() {
-                    None
-                } else if let Some(port_str) = rest.strip_prefix(':') {
-                    Some(
-                        port_str
-                            .parse::<u16>()
-                            .map_err(|e| format!("Invalid ProxyJump port in {item}: {e}"))?,
-                    )
-                } else {
-                    return Err(format!("Invalid ProxyJump host/port format: {item}"));
-                };
-                (host.to_string(), port)
-            } else if host_port.matches(':').count() > 1 {
-                (host_port.to_string(), None)
-            } else if let Some((host, port)) = host_port.rsplit_once(':') {
-                let port = port
-                    .parse::<u16>()
-                    .map_err(|e| format!("Invalid ProxyJump port in {item}: {e}"))?;
-                (host.to_string(), Some(port))
-            } else {
-                (host_port.to_string(), None)
-            };
-            if host.is_empty() {
-                return Err(format!("Invalid ProxyJump host: {item}"));
-            }
-            Ok(JumpSpec { user, host, port })
-        })
-        .collect()
-}
-
-fn endpoint_from_jump_spec(
+fn resolve_jump_endpoint(
     spec: &JumpSpec,
     ssh_config: Option<&PathBuf>,
     default_user: &str,
     cli_identity: Option<&PathBuf>,
-) -> Result<Endpoint, String> {
+) -> Result<Endpoint> {
     let mut host = spec.host.clone();
     let mut host_config_user = None;
     let mut port = 22;
@@ -313,11 +308,14 @@ fn endpoint_from_jump_spec(
     if let Some(ssh_config) = ssh_config
         && ssh_config.exists()
     {
-        let config = parse_path(ssh_config, spec.host.as_str())
-            .map_err(|e| format!("Failed to parse jump host configuration: {e}"))?;
-        let config_host = config.host();
-        if !config_host.is_empty() {
-            host = config_host.to_string();
+        let config = parse_path(ssh_config, spec.host.as_str()).map_err(|e| {
+            ClientError::ConfigParse {
+                context: "jump host configuration",
+                source: e.to_string(),
+            }
+        })?;
+        if !config.host().is_empty() {
+            host = config.host().to_string();
         }
         host_config_user = config.host_config.user.clone();
         port = config.port();
@@ -331,105 +329,172 @@ fn endpoint_from_jump_spec(
         host_config_user,
         default_user,
         spec.user.as_deref(),
-        "proxy host config",
-        "jump spec",
+        Source::ProxyHostConfig,
+        Source::JumpSpec,
     );
     if let Some(spec_port) = spec.port {
         port = spec_port;
     }
     let (identity, identity_source) =
-        resolve_identity(host_config_identity, cli_identity, "proxy host config");
-
+        resolve_identity(host_config_identity, cli_identity, Source::ProxyHostConfig);
     Ok(Endpoint {
-        user,
         host,
         port,
-        identity,
-        identity_source,
-        user_source,
+        auth: AuthSpec {
+            user,
+            identity,
+            user_source,
+            identity_source,
+        },
     })
 }
 
-async fn connect_direct(endpoint: &Endpoint, timeout: f64) -> Result<client::Handle<SshHandler>, String> {
-    let config = Arc::new(client::Config {
-        inactivity_timeout: Some(std::time::Duration::from_secs_f64(timeout)),
-        ..Default::default()
-    });
-    let addr = (endpoint.host.as_str(), endpoint.port);
-    match tokio::time::timeout(
-        std::time::Duration::from_secs_f64(timeout),
-        client::connect(config, addr, SshHandler),
-    )
-    .await
-    {
-        Ok(Ok(session)) => Ok(session),
-        Ok(Err(e)) => Err(format!("Failed to connect to {}: {e}", endpoint.host)),
-        Err(_) => Err(format!("Connection timeout when connecting to {}", endpoint.host)),
+fn parse_proxy_jump(proxy_jump: &str) -> Result<Vec<JumpSpec>> {
+    proxy_jump
+        .split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty() && !item.eq_ignore_ascii_case("none"))
+        .map(|item| {
+            let (user, host_port) = if let Some((user, host_port)) = item.rsplit_once('@') {
+                if user.is_empty() {
+                    return Err(ClientError::InvalidProxyJump(format!(
+                        "Invalid ProxyJump user in target: {item}"
+                    )));
+                }
+                (Some(user.to_string()), host_port)
+            } else {
+                (None, item)
+            };
+            let (host, port) = if host_port.starts_with('[') {
+                let close = host_port.find(']').ok_or_else(|| {
+                    ClientError::InvalidProxyJump(format!(
+                        "Invalid bracketed ProxyJump host: {item}"
+                    ))
+                })?;
+                let rest = &host_port[close + 1..];
+                let port = if rest.is_empty() {
+                    None
+                } else if let Some(port_str) = rest.strip_prefix(':') {
+                    Some(port_str.parse::<u16>().map_err(|e| {
+                        ClientError::InvalidProxyJump(format!("Invalid ProxyJump port in {item}: {e}"))
+                    })?)
+                } else {
+                    return Err(ClientError::InvalidProxyJump(format!(
+                        "Invalid ProxyJump host/port format: {item}"
+                    )));
+                };
+                (host_port[1..close].to_string(), port)
+            } else if host_port.matches(':').count() > 1 {
+                (host_port.to_string(), None)
+            } else if let Some((host, port)) = host_port.rsplit_once(':') {
+                let port = port.parse::<u16>().map_err(|e| {
+                    ClientError::InvalidProxyJump(format!("Invalid ProxyJump port in {item}: {e}"))
+                })?;
+                (host.to_string(), Some(port))
+            } else {
+                (host_port.to_string(), None)
+            };
+            if host.is_empty() {
+                return Err(ClientError::InvalidProxyJump(format!(
+                    "Invalid ProxyJump host: {item}"
+                )));
+            }
+            Ok(JumpSpec { user, host, port })
+        })
+        .collect()
+}
+
+enum Transport<'a> {
+    Direct(&'a Endpoint),
+    ProxyCommand(&'a PathBuf, &'a Endpoint),
+    Jump(&'a mut client::Handle<SshHandler>, &'a Endpoint),
+}
+
+async fn connect_via(transport: Transport<'_>, timeout: f64) -> Result<client::Handle<SshHandler>> {
+    match transport {
+        Transport::Direct(endpoint) => {
+            let addr = (endpoint.host.as_str(), endpoint.port);
+            connect_with_timeout(
+                "connecting to",
+                &endpoint.host,
+                timeout,
+                client::connect(client_config(timeout), addr, SshHandler),
+            )
+            .await
+        }
+        Transport::ProxyCommand(ssh_config, endpoint) => {
+            let parsed = parse_path(ssh_config, endpoint.host.as_str()).map_err(|e| {
+                ClientError::ConfigParse {
+                    context: "SSH config for ProxyCommand",
+                    source: e.to_string(),
+                }
+            })?;
+            let stream = parsed
+                .stream()
+                .await
+                .map_err(|e| ClientError::Connect {
+                    host: endpoint.host.clone(),
+                    source: format!("Failed to connect through ProxyCommand: {e}"),
+                })?;
+            connect_with_timeout(
+                "stream-connecting through ProxyCommand to",
+                &endpoint.host,
+                timeout,
+                client::connect_stream(client_config(timeout), stream, SshHandler),
+            )
+            .await
+        }
+        Transport::Jump(upstream, endpoint) => {
+            let channel = upstream
+                .channel_open_direct_tcpip(endpoint.host.clone(), endpoint.port as u32, "127.0.0.1", 0)
+                .await
+                .map_err(|e| ClientError::Connect {
+                    host: endpoint.host.clone(),
+                    source: format!("Failed to open direct-tcpip channel: {e}"),
+                })?;
+            connect_with_timeout(
+                "stream-connecting to",
+                &endpoint.host,
+                timeout,
+                client::connect_stream(client_config(timeout), channel.into_stream(), SshHandler),
+            )
+            .await
+        }
     }
 }
 
-async fn connect_with_proxy_command(
-    ssh_config: &PathBuf,
-    endpoint: &Endpoint,
-    timeout: f64,
-) -> Result<client::Handle<SshHandler>, String> {
-    let parsed = parse_path(ssh_config, endpoint.host.as_str())
-        .map_err(|e| format!("Failed to parse SSH config for ProxyCommand: {e}"))?;
-    let stream = parsed
-        .stream()
-        .await
-        .map_err(|e| format!("Failed to connect through ProxyCommand: {e}"))?;
-    let config = Arc::new(client::Config {
-        inactivity_timeout: Some(std::time::Duration::from_secs_f64(timeout)),
+fn client_config(timeout: f64) -> Arc<client::Config> {
+    Arc::new(client::Config {
+        inactivity_timeout: Some(Duration::from_secs_f64(timeout)),
         ..Default::default()
-    });
-    match tokio::time::timeout(
-        std::time::Duration::from_secs_f64(timeout),
-        client::connect_stream(config, stream, SshHandler),
-    )
-    .await
-    {
-        Ok(Ok(session)) => Ok(session),
-        Ok(Err(e)) => Err(format!(
-            "Failed to establish stream connection through ProxyCommand to {}: {e}",
-            endpoint.host
-        )),
-        Err(_) => Err(format!(
-            "Connection timeout when stream-connecting through ProxyCommand to {}",
-            endpoint.host
-        )),
-    }
+    })
 }
 
-async fn connect_through_jump(
-    jump: &mut client::Handle<SshHandler>,
-    endpoint: &Endpoint,
+async fn connect_with_timeout<F>(
+    context: &'static str,
+    host: &str,
     timeout: f64,
-) -> Result<client::Handle<SshHandler>, String> {
-    let direct_channel = jump
-        .channel_open_direct_tcpip(endpoint.host.clone(), endpoint.port as u32, "127.0.0.1", 0)
-        .await
-        .map_err(|e| format!("Failed to open direct-tcpip channel to {}: {e}", endpoint.host))?;
-    let stream = direct_channel.into_stream();
-    let config = Arc::new(client::Config {
-        inactivity_timeout: Some(std::time::Duration::from_secs_f64(timeout)),
-        ..Default::default()
-    });
-    match tokio::time::timeout(
-        std::time::Duration::from_secs_f64(timeout),
-        client::connect_stream(config, stream, SshHandler),
-    )
-    .await
-    {
+    future: F,
+) -> Result<client::Handle<SshHandler>>
+where
+    F: std::future::Future<Output = std::result::Result<client::Handle<SshHandler>, russh::Error>>,
+{
+    match tokio::time::timeout(Duration::from_secs_f64(timeout), future).await {
         Ok(Ok(session)) => Ok(session),
-        Ok(Err(e)) => Err(format!("Failed to establish stream connection to {}: {e}", endpoint.host)),
-        Err(_) => Err(format!("Connection timeout when stream-connecting to {}", endpoint.host)),
+        Ok(Err(e)) => Err(ClientError::Connect {
+            host: host.to_string(),
+            source: e.to_string(),
+        }),
+        Err(_) => Err(ClientError::Timeout {
+            context,
+            host: host.to_string(),
+        }),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_proxy_jump, resolve_identity, resolve_user};
+    use super::{parse_proxy_jump, resolve_identity, resolve_user, Source};
     use std::path::PathBuf;
 
     #[test]
@@ -438,17 +503,17 @@ mod tests {
         let cli = PathBuf::from("/tmp/cli_key");
 
         let (identity, source) =
-            resolve_identity(Some(host_cfg.clone()), Some(&cli), "proxy host config");
+            resolve_identity(Some(host_cfg.clone()), Some(&cli), Source::ProxyHostConfig);
         assert_eq!(identity, Some(host_cfg));
-        assert_eq!(source, "proxy host config");
+        assert_eq!(source, Source::ProxyHostConfig);
 
-        let (identity, source) = resolve_identity(None, Some(&cli), "proxy host config");
+        let (identity, source) = resolve_identity(None, Some(&cli), Source::ProxyHostConfig);
         assert_eq!(identity, Some(cli));
-        assert_eq!(source, "cli identity");
+        assert_eq!(source, Source::CliIdentity);
 
-        let (identity, source) = resolve_identity(None, None, "proxy host config");
+        let (identity, source) = resolve_identity(None, None, Source::ProxyHostConfig);
         assert_eq!(identity, None);
-        assert_eq!(source, "fallback");
+        assert_eq!(source, Source::Fallback);
     }
 
     #[test]
@@ -457,44 +522,41 @@ mod tests {
             Some("cfg-user".to_string()),
             "default-user",
             Some("jump-user"),
-            "proxy host config",
-            "jump spec",
+            Source::ProxyHostConfig,
+            Source::JumpSpec,
         );
         assert_eq!(user, "jump-user");
-        assert_eq!(source, "jump spec");
+        assert_eq!(source, Source::JumpSpec);
 
         let (user, source) = resolve_user(
             Some("cfg-user".to_string()),
             "default-user",
             None,
-            "proxy host config",
-            "jump spec",
+            Source::ProxyHostConfig,
+            Source::JumpSpec,
         );
         assert_eq!(user, "cfg-user");
-        assert_eq!(source, "proxy host config");
+        assert_eq!(source, Source::ProxyHostConfig);
 
         let (user, source) = resolve_user(
             None,
             "default-user",
             None,
-            "proxy host config",
-            "jump spec",
+            Source::ProxyHostConfig,
+            Source::JumpSpec,
         );
         assert_eq!(user, "default-user");
-        assert_eq!(source, "inherited/default");
+        assert_eq!(source, Source::InheritedDefault);
     }
 
     #[test]
     fn proxy_jump_parses_ipv6_and_port_forms() {
         let parsed = parse_proxy_jump("[::1]:2222,fe80::1,jump.example:2200").unwrap();
         assert_eq!(parsed.len(), 3);
-
         assert_eq!(parsed[0].host, "::1");
         assert_eq!(parsed[0].port, Some(2222));
-
         assert_eq!(parsed[1].host, "fe80::1");
         assert_eq!(parsed[1].port, None);
-
         assert_eq!(parsed[2].host, "jump.example");
         assert_eq!(parsed[2].port, Some(2200));
     }
