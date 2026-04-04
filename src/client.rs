@@ -151,7 +151,7 @@ pub async fn establish_authenticated_session(
 
         let default_user = resolved.target_endpoint.user.clone();
         let first_jump = endpoint_from_jump_spec(
-            jumps.first().expect("non-empty jumps"),
+            jumps.first().ok_or("ProxyJump list became empty unexpectedly")?,
             ssh_config,
             default_user.as_str(),
             cli_identity,
@@ -162,20 +162,20 @@ pub async fn establish_authenticated_session(
         for jump_spec in jumps.iter().skip(1) {
             let endpoint =
                 endpoint_from_jump_spec(jump_spec, ssh_config, default_user.as_str(), cli_identity)?;
+            let Some(last_jump) = jump_sessions.last_mut() else {
+                return Err("No jump session available while establishing ProxyJump chain".to_string());
+            };
             let jump_session = connector
-                .connect_through_jump_auth(
-                    jump_sessions.last_mut().expect("at least one jump session"),
-                    &endpoint,
-                )
+                .connect_through_jump_auth(last_jump, &endpoint)
                 .await?;
             jump_sessions.push(jump_session);
         }
 
+        let Some(last_jump) = jump_sessions.last_mut() else {
+            return Err("No jump session available for final target connection".to_string());
+        };
         return connector
-            .connect_through_jump_auth(
-                jump_sessions.last_mut().expect("at least one jump session"),
-                &resolved.target_endpoint,
-            )
+            .connect_through_jump_auth(last_jump, &resolved.target_endpoint)
             .await;
     }
 
@@ -263,7 +263,27 @@ fn parse_proxy_jump(proxy_jump: &str) -> Result<Vec<JumpSpec>, String> {
             } else {
                 (None, item)
             };
-            let (host, port) = if let Some((host, port)) = host_port.rsplit_once(':') {
+            let (host, port) = if host_port.starts_with('[') {
+                let close = host_port
+                    .find(']')
+                    .ok_or_else(|| format!("Invalid bracketed ProxyJump host: {item}"))?;
+                let host = &host_port[1..close];
+                let rest = &host_port[close + 1..];
+                let port = if rest.is_empty() {
+                    None
+                } else if let Some(port_str) = rest.strip_prefix(':') {
+                    Some(
+                        port_str
+                            .parse::<u16>()
+                            .map_err(|e| format!("Invalid ProxyJump port in {item}: {e}"))?,
+                    )
+                } else {
+                    return Err(format!("Invalid ProxyJump host/port format: {item}"));
+                };
+                (host.to_string(), port)
+            } else if host_port.matches(':').count() > 1 {
+                (host_port.to_string(), None)
+            } else if let Some((host, port)) = host_port.rsplit_once(':') {
                 let port = port
                     .parse::<u16>()
                     .map_err(|e| format!("Invalid ProxyJump port in {item}: {e}"))?;
@@ -409,7 +429,7 @@ async fn connect_through_jump(
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_identity, resolve_user};
+    use super::{parse_proxy_jump, resolve_identity, resolve_user};
     use std::path::PathBuf;
 
     #[test]
@@ -462,5 +482,20 @@ mod tests {
         );
         assert_eq!(user, "default-user");
         assert_eq!(source, "inherited/default");
+    }
+
+    #[test]
+    fn proxy_jump_parses_ipv6_and_port_forms() {
+        let parsed = parse_proxy_jump("[::1]:2222,fe80::1,jump.example:2200").unwrap();
+        assert_eq!(parsed.len(), 3);
+
+        assert_eq!(parsed[0].host, "::1");
+        assert_eq!(parsed[0].port, Some(2222));
+
+        assert_eq!(parsed[1].host, "fe80::1");
+        assert_eq!(parsed[1].port, None);
+
+        assert_eq!(parsed[2].host, "jump.example");
+        assert_eq!(parsed[2].port, Some(2200));
     }
 }
