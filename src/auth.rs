@@ -1,6 +1,5 @@
 use std::{
-    env,
-    fmt,
+    env, fmt,
     io::{self, IsTerminal},
     path::{Path, PathBuf},
     sync::Arc,
@@ -34,12 +33,18 @@ impl fmt::Display for AuthError {
             Self::DecodeSecretKey(msg) => write!(f, "Failed to decode secret key: {msg}"),
             Self::RsaHash(msg) => write!(f, "Failed to get RSA hash algorithm: {msg}"),
             Self::PublicKeyTimeout(timeout) => {
-                write!(f, "Public key authentication timed out after {timeout} seconds")
+                write!(
+                    f,
+                    "Public key authentication timed out after {timeout} seconds"
+                )
             }
             Self::PublicKeyFailed(msg) => write!(f, "Public key authentication failed: {msg}"),
             Self::PublicKeyRejected => write!(f, "Public key authentication returned false"),
             Self::PasswordTimeout(timeout) => {
-                write!(f, "Password authentication timed out after {timeout} seconds")
+                write!(
+                    f,
+                    "Password authentication timed out after {timeout} seconds"
+                )
             }
             Self::PasswordFailed(msg) => write!(f, "Password authentication failed: {msg}"),
             Self::PasswordRejected => write!(f, "Password authentication returned false"),
@@ -88,8 +93,7 @@ async fn authenticate_publickey<H: client::Handler>(
     )
     .await
     .map_err(|_| AuthError::PublicKeyTimeout(timeout))?;
-    let auth_result =
-        timeout_result.map_err(|e| AuthError::PublicKeyFailed(e.to_string()))?;
+    let auth_result = timeout_result.map_err(|e| AuthError::PublicKeyFailed(e.to_string()))?;
     if !auth_result.success() {
         return Err(AuthError::PublicKeyRejected);
     }

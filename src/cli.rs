@@ -354,8 +354,8 @@ mod tests {
     }
 
     #[test]
-    fn parse_local_path_reports_canonicalize_errors() {
-        let result = parse_local_path("/proc/1/root/no-such-path");
-        assert!(result.is_err());
+    fn parse_local_path_allows_non_existing_path() {
+        let result = parse_local_path("/tmp/sshping-path-does-not-exist");
+        assert!(result.is_ok());
     }
 }

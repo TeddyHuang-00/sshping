@@ -75,4 +75,4 @@ jobs:
       - name: Run Cargo
         run: cargo build --locked --target ${{ matrix.target }}
 
-      # We might include unit test in the future, but we don't have any at the time
+      # Unit tests are run separately in repository validation workflows.
