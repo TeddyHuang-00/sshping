@@ -1,13 +1,15 @@
 mod auth;
 mod cli;
 mod client;
+mod completer;
 mod summary;
 mod tests;
 mod util;
 
 use std::{io::Read, process::ExitCode, time::Instant};
 
-use clap::Parser;
+use clap::{CommandFactory, Parser};
+use clap_complete::{CompleteEnv, aot::generate};
 use cli::{Options, Test};
 use client::{build_connection_plan, connect_plan};
 use log::{debug, error, trace, LevelFilter};
@@ -22,7 +24,20 @@ use util::Formatter;
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    CompleteEnv::with_factory(Options::command)
+        .var("SSHPING_COMPLETE")
+        .complete();
+
     let mut opts = Options::parse();
+    if let Some(shell) = opts.generate_completion {
+        let mut cmd = Options::command();
+        generate(shell, &mut cmd, "sshping".to_string(), &mut std::io::stdout());
+        return ExitCode::SUCCESS;
+    }
+    if opts.target.is_none() {
+        error!("Missing target. Provide <TARGET> unless generating completions.");
+        return ExitCode::FAILURE;
+    }
 
     // Initialize logging
     SimpleLogger::new()
@@ -53,9 +68,13 @@ async fn main() -> ExitCode {
     };
 
     trace!("Options: {:?}", opts);
-    debug!("User: {}", opts.target.user);
-    debug!("Host: {}", opts.target.host);
-    debug!("Port: {}", opts.target.port);
+    let Some(target) = opts.target.as_ref() else {
+        error!("Missing target. Provide <TARGET> unless generating completions.");
+        return ExitCode::FAILURE;
+    };
+    debug!("User: {}", target.user);
+    debug!("Host: {}", target.host);
+    debug!("Port: {}", target.port);
 
     let connect_start = Instant::now();
     let session = match connect_plan(&plan, opts.ssh_timeout, opts.password.as_deref()).await {

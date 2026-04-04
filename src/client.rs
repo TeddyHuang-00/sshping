@@ -156,6 +156,11 @@ struct JumpSpec {
 }
 
 pub fn build_connection_plan(opts: &mut Options) -> Result<ConnectionPlan> {
+    let Some(target) = opts.target.as_mut() else {
+        return Err(ClientError::Route(
+            "Missing target. Provide <TARGET> unless generating completions.".to_string(),
+        ));
+    };
     let cli_identity = opts.identity.clone();
     let mut proxy_jump = None;
     let mut proxy_command = None;
@@ -166,21 +171,21 @@ pub fn build_connection_plan(opts: &mut Options) -> Result<ConnectionPlan> {
         && ssh_config.exists()
     {
         debug!("SSH Config: {:?}", ssh_config);
-        let config = parse_path(ssh_config, opts.target.host.as_str()).map_err(|e| {
+        let config = parse_path(ssh_config, target.host.as_str()).map_err(|e| {
             ClientError::ConfigParse {
                 context: "configuration",
                 source: e.to_string(),
             }
         })?;
         if !config.host().is_empty() {
-            opts.target.host = config.host().to_string();
+            target.host = config.host().to_string();
         }
         if let Some(user) = config.host_config.user {
-            opts.target.user = user;
+            target.user = user;
             target_user_source = Source::TargetHostConfig;
         }
         if let Some(port) = config.host_config.port {
-            opts.target.port = port;
+            target.port = port;
         }
         target_identity_from_config = config
             .host_config
@@ -196,10 +201,10 @@ pub fn build_connection_plan(opts: &mut Options) -> Result<ConnectionPlan> {
         Source::TargetHostConfig,
     );
     let target = Endpoint {
-        host: opts.target.host.clone(),
-        port: opts.target.port,
+        host: target.host.clone(),
+        port: target.port,
         auth: AuthSpec {
-            user: opts.target.user.clone(),
+            user: target.user.clone(),
             identity: target_identity.0,
             identity_source: target_identity.1,
             user_source: target_user_source,

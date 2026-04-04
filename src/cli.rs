@@ -6,10 +6,13 @@ use clap::{
     crate_authors, crate_description, crate_name, crate_version, ArgAction, Parser, ValueEnum,
     ValueHint,
 };
+use clap_complete::{aot::Shell, engine::ArgValueCompleter};
 use regex::Regex;
 use shellexpand::tilde;
 use tabled::{settings::Style, Table};
 use whoami::username;
+
+use crate::completer::complete_host;
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Debug, Eq, PartialEq, ValueEnum)]
@@ -59,8 +62,14 @@ impl TableStyle {
 #[command(styles = get_styles())]
 pub struct Options {
     /// [user@]host[:port]
-    #[arg(value_parser = parse_target, value_hint = ValueHint::Hostname, group = "main_action")]
-    pub target: Target,
+    #[arg(
+        value_parser = parse_target,
+        value_hint = ValueHint::Hostname,
+        group = "main_action",
+        required_unless_present = "generate_completion",
+        add = ArgValueCompleter::new(complete_host)
+    )]
+    pub target: Option<Target>,
 
     /// Read the ssh config file FILE for options
     ///
@@ -249,6 +258,10 @@ pub struct Options {
     /// Examples: 1.5 MB/s, 1s 259ms
     #[arg(short = 'H', long)]
     pub human_readable: bool,
+
+    /// Generate completion script for shell and exit
+    #[arg(long, value_enum, value_name = "SHELL")]
+    pub generate_completion: Option<Shell>,
 
     /// Wait for keyboard input before exiting
     #[arg(short, long)]
