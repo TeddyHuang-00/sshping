@@ -1,7 +1,8 @@
 use std::{
     env,
+    fmt,
     io::{self, IsTerminal},
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -12,15 +13,52 @@ use russh::{
     keys::{decode_secret_key, PrivateKeyWithHashAlg},
 };
 
+#[derive(Debug)]
+pub enum AuthError {
+    ReadIdentityFile(String),
+    DecodeSecretKey(String),
+    RsaHash(String),
+    PublicKeyTimeout(f64),
+    PublicKeyFailed(String),
+    PublicKeyRejected,
+    PasswordTimeout(f64),
+    PasswordFailed(String),
+    PasswordRejected,
+    AllMethodsFailed,
+}
+
+impl fmt::Display for AuthError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::ReadIdentityFile(msg) => write!(f, "Failed to read identity file: {msg}"),
+            Self::DecodeSecretKey(msg) => write!(f, "Failed to decode secret key: {msg}"),
+            Self::RsaHash(msg) => write!(f, "Failed to get RSA hash algorithm: {msg}"),
+            Self::PublicKeyTimeout(timeout) => {
+                write!(f, "Public key authentication timed out after {timeout} seconds")
+            }
+            Self::PublicKeyFailed(msg) => write!(f, "Public key authentication failed: {msg}"),
+            Self::PublicKeyRejected => write!(f, "Public key authentication returned false"),
+            Self::PasswordTimeout(timeout) => {
+                write!(f, "Password authentication timed out after {timeout} seconds")
+            }
+            Self::PasswordFailed(msg) => write!(f, "Password authentication failed: {msg}"),
+            Self::PasswordRejected => write!(f, "Password authentication returned false"),
+            Self::AllMethodsFailed => write!(f, "All authentication methods failed"),
+        }
+    }
+}
+
+impl std::error::Error for AuthError {}
+
 async fn authenticate_publickey<H: client::Handler>(
     session: &mut client::Handle<H>,
     user: &str,
-    identity: &PathBuf,
+    identity: &Path,
     password: Option<&str>,
     timeout: f64,
-) -> Result<(), String> {
+) -> Result<(), AuthError> {
     let key_content = std::fs::read_to_string(identity)
-        .map_err(|e| format!("Failed to read identity file: {e}"))?;
+        .map_err(|e| AuthError::ReadIdentityFile(e.to_string()))?;
 
     // Try to decode the key with the provided password first
     let mut key_result = decode_secret_key(&key_content, password);
@@ -35,13 +73,13 @@ async fn authenticate_publickey<H: client::Handler>(
         }
     }
 
-    let key = key_result.map_err(|e| format!("Failed to decode secret key: {e}"))?;
+    let key = key_result.map_err(|e| AuthError::DecodeSecretKey(e.to_string()))?;
 
     // Get the best supported RSA hash algorithm for the connection
     let rsa_hash = session
         .best_supported_rsa_hash()
         .await
-        .map_err(|e| format!("Failed to get RSA hash algorithm: {e}"))?
+        .map_err(|e| AuthError::RsaHash(e.to_string()))?
         .flatten();
 
     let timeout_result = tokio::time::timeout(
@@ -49,11 +87,11 @@ async fn authenticate_publickey<H: client::Handler>(
         session.authenticate_publickey(user, PrivateKeyWithHashAlg::new(Arc::new(key), rsa_hash)),
     )
     .await
-    .map_err(|_| format!("Public key authentication timed out after {timeout} seconds"))?;
+    .map_err(|_| AuthError::PublicKeyTimeout(timeout))?;
     let auth_result =
-        timeout_result.map_err(|e| format!("Public key authentication failed: {e}"))?;
+        timeout_result.map_err(|e| AuthError::PublicKeyFailed(e.to_string()))?;
     if !auth_result.success() {
-        return Err("Public key authentication returned false".to_string());
+        return Err(AuthError::PublicKeyRejected);
     }
 
     info!("Public key authentication succeeded");
@@ -85,16 +123,16 @@ async fn authenticate_password<H: client::Handler>(
     user: &str,
     password: &str,
     timeout: f64,
-) -> Result<(), String> {
+) -> Result<(), AuthError> {
     let timeout_result = tokio::time::timeout(
         Duration::from_secs_f64(timeout),
         session.authenticate_password(user, password),
     )
     .await
-    .map_err(|_| format!("Password authentication timed out after {timeout} seconds"))?;
-    let auth_result = timeout_result.map_err(|e| format!("Password authentication failed: {e}"))?;
+    .map_err(|_| AuthError::PasswordTimeout(timeout))?;
+    let auth_result = timeout_result.map_err(|e| AuthError::PasswordFailed(e.to_string()))?;
     if !auth_result.success() {
-        return Err("Password authentication returned false".to_string());
+        return Err(AuthError::PasswordRejected);
     }
 
     info!("Password authentication succeeded");
@@ -106,9 +144,9 @@ pub async fn authenticate_all<H: client::Handler>(
     user: &str,
     host: &str,
     password: Option<&str>,
-    identity: Option<&PathBuf>,
+    identity: Option<&Path>,
     timeout: f64,
-) -> Result<Duration, &'static str> {
+) -> Result<Duration, AuthError> {
     let start = Instant::now();
 
     // Try public key authentication if identity file is provided
@@ -165,5 +203,5 @@ pub async fn authenticate_all<H: client::Handler>(
     }
 
     // Fails if all authentication methods fail
-    Err("All authentication methods failed")
+    Err(AuthError::AllMethodsFailed)
 }
