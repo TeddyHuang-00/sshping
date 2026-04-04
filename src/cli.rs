@@ -300,7 +300,11 @@ fn parse_target(s: &str) -> Result<Target, String> {
             .map_or_else(username, |m| Ok(m.as_str().to_string()))
             .map_err(|e| format!("Error: {e}"))?;
         let host = cap.get(2).unwrap().as_str().to_string();
-        let port = cap.get(3).map_or(22, |m| m.as_str().parse().unwrap());
+        let port = cap.get(3).map_or(Ok(22), |m| {
+            m.as_str()
+                .parse()
+                .map_err(|e| format!("Invalid port '{}': {e}", m.as_str()))
+        })?;
         Ok(Target { user, host, port })
     } else {
         Err("Invalid target format. Must be [user@]host[:port]".to_string())
@@ -308,15 +312,18 @@ fn parse_target(s: &str) -> Result<Target, String> {
 }
 
 fn parse_local_path(s: &str) -> Result<PathBuf, String> {
-    Ok(match PathBuf::from(tilde(s).to_string()) {
-        path if !path.exists() => path,
-        path => path.canonicalize().expect("Failed to parse path"),
-    })
+    match PathBuf::from(tilde(s).to_string()) {
+        path if !path.exists() => Ok(path),
+        path => path
+            .canonicalize()
+            .map_err(|e| format!("Failed to parse path '{}': {e}", path.display())),
+    }
 }
 
 fn parse_file_size(s: &str) -> Result<u64, String> {
-    let size = s.parse::<ByteSize>().unwrap().0;
-    Ok(size)
+    s.parse::<ByteSize>()
+        .map(|size| size.0)
+        .map_err(|e| format!("Invalid file size '{s}': {e}"))
 }
 
 const fn get_styles() -> Styles {
@@ -328,4 +335,27 @@ const fn get_styles() -> Styles {
         .error(AnsiColor::Red.on_default().bold())
         .valid(AnsiColor::Green.on_default().bold())
         .invalid(AnsiColor::Yellow.on_default().bold())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_file_size, parse_local_path, parse_target};
+
+    #[test]
+    fn parse_target_rejects_out_of_range_port() {
+        let result = parse_target("user@localhost:70000");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_file_size_rejects_invalid_input() {
+        let result = parse_file_size("not-a-size");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn parse_local_path_reports_canonicalize_errors() {
+        let result = parse_local_path("/proc/1/root/no-such-path");
+        assert!(result.is_err());
+    }
 }
