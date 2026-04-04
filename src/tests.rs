@@ -26,6 +26,7 @@ pub enum TestError {
     InvalidRemotePath,
     EmptyEchoResult,
     EmptyRemoteFile,
+    SummaryCreation(String),
 }
 
 impl fmt::Display for TestError {
@@ -36,6 +37,7 @@ impl fmt::Display for TestError {
             Self::InvalidRemotePath => write!(f, "Invalid remote file path"),
             Self::EmptyEchoResult => write!(f, "Unable to get any echos in given time"),
             Self::EmptyRemoteFile => write!(f, "Remote file is empty"),
+            Self::SummaryCreation(msg) => write!(f, "Failed to summarize test result: {msg}"),
         }
     }
 }
@@ -166,7 +168,8 @@ pub async fn run_echo_test<H: client::Handler>(
         return Err(TestError::EmptyEchoResult);
     }
     latencies.sort();
-    let result = EchoTestSummary::from_latencies(&latencies, formatter).map_err(TestError::Ssh)?;
+    let result = EchoTestSummary::from_latencies(&latencies, formatter)
+        .map_err(TestError::SummaryCreation)?;
     if result.char_sent < 20 {
         warn!("Insufficient data points for accurate latency measurement");
     }
@@ -255,6 +258,7 @@ async fn run_upload_test<H: client::Handler>(
     // Starting uploading file
     trace!("Sending file in chunks");
     while total_bytes_sent < size as usize {
+        debug_assert!(total_bytes_sent < size as usize);
         let to_send = chunk_size
             .min((size as usize - total_bytes_sent) as u64)
             .max(1) as usize;

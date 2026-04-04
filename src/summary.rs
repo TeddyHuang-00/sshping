@@ -37,12 +37,14 @@ impl EchoTestSummary {
                 _ => latencies[char_sent / 2],
             }) as u64,
         ));
-        let min_latency = formatter.format_duration(Duration::from_nanos(
-            latencies.first().unwrap().to_owned() as u64,
-        ));
-        let max_latency = formatter.format_duration(Duration::from_nanos(
-            latencies.last().unwrap().to_owned() as u64,
-        ));
+        let min = *latencies
+            .first()
+            .expect("latencies validated as non-empty above");
+        let max = *latencies
+            .last()
+            .expect("latencies validated as non-empty above");
+        let min_latency = formatter.format_duration(Duration::from_nanos(min as u64));
+        let max_latency = formatter.format_duration(Duration::from_nanos(max as u64));
         Ok(Self {
             char_sent,
             avg_latency,
@@ -140,5 +142,12 @@ mod tests {
         let formatter = Formatter::new(false, Some(','));
         let result = SpeedTestResult::new(1024, Duration::from_nanos(0), &formatter);
         assert_eq!(result.speed, "0 B/s");
+    }
+
+    #[test]
+    fn speed_result_handles_small_non_zero_duration() {
+        let formatter = Formatter::new(false, Some(','));
+        let result = SpeedTestResult::new(1024, Duration::from_nanos(1), &formatter);
+        assert_eq!(result.speed, "1,024,000,000,000 B/s");
     }
 }
