@@ -220,4 +220,66 @@ If more than one identity file is given in the configuration file, only the firs
 
 ### Shell autocompletion doesn't work
 
-Make sure you have downloaded the completion script and sourced it in your shell profile, or place it in the appropriate directory for your shell.
+`sshping` supports **two completion engines**:
+
+1. **Runtime dynamic completion (recommended)** with `clap_complete::CompleteEnv`:
+
+   This is recommended because it stays in sync with the installed binary and supports dynamic candidates (for example SSH config hosts).
+   - Bash:
+
+     ```bash
+     echo "source <(SSHPING_COMPLETE=bash sshping)" >> ~/.bashrc
+     # Or source it directly in the current shell session:
+     source <(SSHPING_COMPLETE=bash sshping)
+     ```
+
+   - Zsh:
+
+     ```zsh
+     echo "source <(SSHPING_COMPLETE=zsh sshping)" >> ~/.zshrc
+     # Or source it directly in the current shell session:
+     source <(SSHPING_COMPLETE=zsh sshping)
+     ```
+
+   - Fish:
+
+     ```fish
+     echo "source (SSHPING_COMPLETE=fish sshping)" >> ~/.config/fish/config.fish
+     # Or source it directly in the current shell session:
+     source (SSHPING_COMPLETE=fish sshping)
+     ```
+
+   - Elvish:
+
+     ```elvish
+     echo "eval (E:SSHPING_COMPLETE=elvish sshping | slurp)" >> ~/.elvish/rc.elv
+     # Or source it directly in the current shell session:
+     eval (E:SSHPING_COMPLETE=elvish sshping | slurp)
+     ```
+
+   - PowerShell:
+
+     ```powershell
+     $env:SSHPING_COMPLETE = "powershell"
+     echo "sshping | Out-String | Invoke-Expression" >> $PROFILE
+     Remove-Item Env:\SSHPING_COMPLETE
+     # Or source it directly in the current shell session:
+     $env:SSHPING_COMPLETE = "powershell"
+     sshping | Out-String | Invoke-Expression
+     Remove-Item Env:\SSHPING_COMPLETE
+     ```
+
+   - Xonsh:
+
+     _Note: Xonsh support is currently not available in `clap_complete`, but it can be added using the following workaround_
+     1. Install `fish` shell and follow the fish instructions above to generate the completion script for fish shell.
+     2. Install `xontrib-fish-completer` xontrib to enable sourcing fish completion scripts in xonsh.
+     3. Load `xontrib-fish-completer` in your xonsh configuration:
+
+        ```xonsh
+        xontrib load fish_completer
+        ```
+
+2. **Static completion scripts** generated at build time by `build.rs` (written under `target/<profile>/completions`).
+
+   You can download the static files from [releases page](https://github.com/TeddyHuang-00/sshping/releases) and source those manually if you prefer file-based setup.

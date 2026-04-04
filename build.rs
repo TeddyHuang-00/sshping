@@ -3,10 +3,14 @@ use std::{env, io::Error};
 use clap::CommandFactory;
 use clap_complete::{generate_to, Shell};
 
+mod completer {
+    include!("src/completer.rs");
+}
 include!("src/cli.rs");
 
 fn main() -> Result<(), Error> {
     println!("cargo::rerun-if-changed=src/cli.rs");
+    println!("cargo::rerun-if-changed=src/completer.rs");
     let outdir = match env::var_os("OUT_DIR") {
         None => return Ok(()),
         Some(outdir) => outdir,

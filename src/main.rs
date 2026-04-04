@@ -1,13 +1,15 @@
 mod auth;
 mod cli;
 mod client;
+mod completer;
 mod summary;
 mod tests;
 mod util;
 
 use std::{io::Read, process::ExitCode, time::Instant};
 
-use clap::Parser;
+use clap::{CommandFactory, Parser};
+use clap_complete::CompleteEnv;
 use cli::{Options, Test};
 use client::{build_connection_plan, connect_plan};
 use log::{debug, error, trace, LevelFilter};
@@ -22,6 +24,10 @@ use util::Formatter;
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    CompleteEnv::with_factory(Options::command)
+        .var("SSHPING_COMPLETE")
+        .complete();
+
     let mut opts = Options::parse();
 
     // Initialize logging

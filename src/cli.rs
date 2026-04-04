@@ -6,10 +6,13 @@ use clap::{
     crate_authors, crate_description, crate_name, crate_version, ArgAction, Parser, ValueEnum,
     ValueHint,
 };
+use clap_complete::engine::ArgValueCompleter;
 use regex::Regex;
 use shellexpand::tilde;
 use tabled::{settings::Style, Table};
 use whoami::username;
+
+use crate::completer::complete_host;
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Clone, Debug, Eq, PartialEq, ValueEnum)]
@@ -59,7 +62,12 @@ impl TableStyle {
 #[command(styles = get_styles())]
 pub struct Options {
     /// [user@]host[:port]
-    #[arg(value_parser = parse_target, value_hint = ValueHint::Hostname, group = "main_action")]
+    #[arg(
+        value_parser = parse_target,
+        value_hint = ValueHint::Hostname,
+        group = "main_action",
+        add = ArgValueCompleter::new(complete_host)
+    )]
     pub target: Target,
 
     /// Read the ssh config file FILE for options
