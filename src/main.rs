@@ -137,7 +137,7 @@ fn endpoint_from_jump_spec(
         if !config_host.is_empty() {
             host = config_host.to_string();
         }
-        host_config_user = config.host_config.user;
+        host_config_user = config.host_config.user.clone();
         port = config.port();
         host_config_identity = config
             .host_config
