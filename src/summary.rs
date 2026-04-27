@@ -75,11 +75,10 @@ pub struct SpeedTestResult {
 impl SpeedTestResult {
     pub fn new(size: u64, time: Duration, formatter: &Formatter) -> Self {
         let time_nanos = time.as_nanos();
-        let speed = if time_nanos == 0 {
-            0
-        } else {
-            ((size as u128) * 1_000_000_000 / time_nanos) as u64
-        };
+        let speed = (size as u128 * 1_000_000_000)
+            .checked_div(time_nanos)
+            .map(|v| v as u64)
+            .unwrap_or_default();
         Self {
             size: formatter.format_size(size),
             time: formatter.format_duration(time),
