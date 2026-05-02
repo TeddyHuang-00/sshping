@@ -7,7 +7,7 @@ use std::{
 
 use log::debug;
 use russh::client;
-use russh_config::parse_path;
+use russh_config::parse;
 
 use crate::{auth::authenticate_all, cli::Options};
 
@@ -155,6 +155,62 @@ struct JumpSpec {
     port: Option<u16>,
 }
 
+/// Strip `Match` directive blocks from SSH config content.
+///
+/// The `russh-config` parser does not support the `Match` keyword and returns
+/// `HostNotFound` when it encounters any unrecognised key before the first
+/// `Host` block.  This helper removes every `Match` line together with all
+/// subsequent option lines that belong to that match block (i.e. lines up to,
+/// but not including, the next `Host` or `Match` keyword).
+fn strip_match_blocks(contents: &str) -> String {
+    let mut result = Vec::new();
+    let mut in_match_block = false;
+
+    for line in contents.lines() {
+        let trimmed = line.trim();
+
+        // Preserve blank lines and comments unless we are inside a Match block.
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            if !in_match_block {
+                result.push(line);
+            }
+            continue;
+        }
+
+        let lower = trimmed.to_ascii_lowercase();
+
+        if lower.starts_with("match ") {
+            in_match_block = true;
+            continue;
+        }
+
+        // A `Host` keyword ends any current Match block and starts a Host block.
+        if lower.starts_with("host ") {
+            in_match_block = false;
+        }
+
+        if !in_match_block {
+            result.push(line);
+        }
+    }
+
+    result.join("\n")
+}
+
+/// Read an SSH config file, strip unsupported `Match` blocks, and parse it
+/// for the given `host`.
+fn parse_config_path(path: &Path, host: &str, context: &'static str) -> Result<russh_config::Config> {
+    let contents = std::fs::read_to_string(path).map_err(|e| ClientError::ConfigParse {
+        context,
+        source: e.to_string(),
+    })?;
+    let cleaned = strip_match_blocks(&contents);
+    parse(&cleaned, host).map_err(|e| ClientError::ConfigParse {
+        context,
+        source: e.to_string(),
+    })
+}
+
 pub fn build_connection_plan(opts: &mut Options) -> Result<ConnectionPlan> {
     let cli_identity = opts.identity.clone();
     let mut proxy_jump = None;
@@ -166,12 +222,7 @@ pub fn build_connection_plan(opts: &mut Options) -> Result<ConnectionPlan> {
         && ssh_config.exists()
     {
         debug!("SSH Config: {:?}", ssh_config);
-        let config = parse_path(ssh_config, opts.target.host.as_str()).map_err(|e| {
-            ClientError::ConfigParse {
-                context: "configuration",
-                source: e.to_string(),
-            }
-        })?;
+        let config = parse_config_path(ssh_config, opts.target.host.as_str(), "configuration")?;
         if !config.host().is_empty() {
             opts.target.host = config.host().to_string();
         }
@@ -329,11 +380,7 @@ fn resolve_jump_endpoint(
     let host_config_identity = if let Some(ssh_config) = ssh_config
         && ssh_config.exists()
     {
-        let config =
-            parse_path(ssh_config, spec.host.as_str()).map_err(|e| ClientError::ConfigParse {
-                context: "jump host configuration",
-                source: e.to_string(),
-            })?;
+        let config = parse_config_path(ssh_config, spec.host.as_str(), "jump host configuration")?;
         if !config.host().is_empty() {
             host = config.host().to_string();
         }
@@ -448,12 +495,7 @@ async fn connect_via(transport: Transport<'_>, timeout: f64) -> Result<client::H
             .await
         }
         Transport::ProxyCommand(ssh_config, endpoint) => {
-            let parsed = parse_path(ssh_config, endpoint.host.as_str()).map_err(|e| {
-                ClientError::ConfigParse {
-                    context: "SSH config for ProxyCommand",
-                    source: e.to_string(),
-                }
-            })?;
+            let parsed = parse_config_path(ssh_config, endpoint.host.as_str(), "SSH config for ProxyCommand")?;
             let stream = parsed.stream().await.map_err(|e| ClientError::Connect {
                 host: endpoint.host.clone(),
                 source: format!("Failed to connect through ProxyCommand: {e}"),
@@ -523,7 +565,86 @@ where
 mod tests {
     use std::path::PathBuf;
 
-    use super::{parse_proxy_jump, resolve_identity, resolve_user, Source};
+    use super::{parse_proxy_jump, resolve_identity, resolve_user, strip_match_blocks, Source};
+
+    #[test]
+    fn match_block_at_start_is_stripped() {
+        let config = r#"Match host * exec "gpg-connect-agent UPDATESTARTUPTTY /bye"
+Host myserver
+    User alice
+    Port 2222
+"#;
+        let cleaned = strip_match_blocks(config);
+        // The Match line must be absent and the Host block must remain intact.
+        assert!(!cleaned.contains("Match"));
+        assert!(cleaned.contains("Host myserver"));
+        assert!(cleaned.contains("User alice"));
+        assert!(cleaned.contains("Port 2222"));
+        // The cleaned config must parse without error for the target host.
+        let result = russh_config::parse(&cleaned, "myserver");
+        assert!(result.is_ok(), "parse failed: {:?}", result.err());
+        let cfg = result.unwrap();
+        assert_eq!(cfg.host_config.user.as_deref(), Some("alice"));
+    }
+
+    #[test]
+    fn match_block_with_settings_is_fully_stripped() {
+        // Settings that appear inside a Match block must not survive.
+        let config = r#"Match host *
+    User should_not_appear
+    Port 9999
+Host myserver
+    User alice
+"#;
+        let cleaned = strip_match_blocks(config);
+        assert!(!cleaned.contains("should_not_appear"));
+        assert!(!cleaned.contains("9999"));
+        assert!(cleaned.contains("Host myserver"));
+        let result = russh_config::parse(&cleaned, "myserver");
+        assert!(result.is_ok());
+        let cfg = result.unwrap();
+        assert_eq!(cfg.host_config.user.as_deref(), Some("alice"));
+    }
+
+    #[test]
+    fn config_without_match_is_unchanged() {
+        let config = r#"Host myserver
+    User alice
+    Port 22
+"#;
+        let cleaned = strip_match_blocks(config);
+        assert_eq!(cleaned, config.trim_end_matches('\n'));
+    }
+
+    #[test]
+    fn multiple_match_blocks_are_all_stripped() {
+        let config = r#"Match host a exec "cmd1"
+Match host b exec "cmd2"
+Host myserver
+    User alice
+"#;
+        let cleaned = strip_match_blocks(config);
+        assert!(!cleaned.contains("Match"));
+        assert!(cleaned.contains("Host myserver"));
+        let result = russh_config::parse(&cleaned, "myserver");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn comments_outside_match_blocks_are_preserved() {
+        let config = r#"# top comment
+Match host * exec "cmd"
+# comment inside match (should be stripped)
+    User ignored
+Host myserver
+    # comment inside host (should be preserved)
+    User alice
+"#;
+        let cleaned = strip_match_blocks(config);
+        assert!(cleaned.contains("# top comment"));
+        assert!(!cleaned.contains("comment inside match"));
+        assert!(cleaned.contains("comment inside host"));
+    }
 
     #[test]
     fn identity_prefers_host_config_then_cli_then_fallback() {
