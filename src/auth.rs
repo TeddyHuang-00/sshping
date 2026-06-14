@@ -206,12 +206,7 @@ async fn authenticate_agent<H: client::Handler>(
         let public_key = identity.public_key().into_owned();
         let timeout_result = tokio::time::timeout(
             Duration::from_secs_f64(timeout),
-            session.authenticate_publickey_with(
-                user.to_string(),
-                public_key,
-                rsa_hash,
-                &mut agent,
-            ),
+            session.authenticate_publickey_with(user.to_string(), public_key, rsa_hash, &mut agent),
         )
         .await
         .map_err(|_| AuthError::AgentTimeout(timeout))?;
