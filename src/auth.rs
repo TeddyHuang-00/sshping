@@ -9,7 +9,7 @@ use std::{
 use log::{debug, info, warn};
 use russh::{
     client,
-    keys::{decode_secret_key, PrivateKeyWithHashAlg},
+    keys::{agent::client::AgentClient, decode_secret_key, PrivateKeyWithHashAlg},
 };
 
 #[derive(Debug)]
@@ -23,6 +23,10 @@ pub enum AuthError {
     PasswordTimeout(f64),
     PasswordFailed(String),
     PasswordRejected,
+    AgentConnect(String),
+    AgentNoIdentities,
+    AgentTimeout(f64),
+    AgentFailed(String),
     AllMethodsFailed,
 }
 
@@ -48,6 +52,17 @@ impl fmt::Display for AuthError {
             }
             Self::PasswordFailed(msg) => write!(f, "Password authentication failed: {msg}"),
             Self::PasswordRejected => write!(f, "Password authentication returned false"),
+            Self::AgentConnect(msg) => write!(f, "Failed to connect to SSH agent: {msg}"),
+            Self::AgentNoIdentities => {
+                write!(f, "SSH agent returned no identities")
+            }
+            Self::AgentTimeout(timeout) => {
+                write!(
+                    f,
+                    "SSH agent authentication timed out after {timeout} seconds"
+                )
+            }
+            Self::AgentFailed(msg) => write!(f, "SSH agent authentication failed: {msg}"),
             Self::AllMethodsFailed => write!(f, "All authentication methods failed"),
         }
     }
@@ -143,6 +158,75 @@ async fn authenticate_password<H: client::Handler>(
     Ok(())
 }
 
+async fn authenticate_agent<H: client::Handler>(
+    session: &mut client::Handle<H>,
+    user: &str,
+    timeout: f64,
+) -> Result<(), AuthError> {
+    // Connect to the SSH agent (platform-specific)
+    #[cfg(unix)]
+    let mut agent = {
+        AgentClient::connect_env()
+            .await
+            .map_err(|e| AuthError::AgentConnect(e.to_string()))?
+            .dynamic()
+    };
+
+    #[cfg(windows)]
+    let mut agent = {
+        // Try named pipe first, fall back to Pageant
+        match AgentClient::connect_named_pipe(r"\\.\pipe\openssh-ssh-agent").await {
+            Ok(client) => client.dynamic(),
+            Err(_) => AgentClient::connect_pageant()
+                .await
+                .map_err(|e| AuthError::AgentConnect(e.to_string()))?
+                .dynamic(),
+        }
+    };
+
+    // Request identities from the agent
+    let identities = agent
+        .request_identities()
+        .await
+        .map_err(|e| AuthError::AgentFailed(e.to_string()))?;
+
+    if identities.is_empty() {
+        return Err(AuthError::AgentNoIdentities);
+    }
+
+    // Get the best supported RSA hash algorithm for the connection
+    let rsa_hash = session
+        .best_supported_rsa_hash()
+        .await
+        .map_err(|e| AuthError::AgentFailed(e.to_string()))?
+        .flatten();
+
+    // Try each identity
+    for identity in &identities {
+        let public_key = identity.public_key().into_owned();
+        let timeout_result = tokio::time::timeout(
+            Duration::from_secs_f64(timeout),
+            session.authenticate_publickey_with(
+                user.to_string(),
+                public_key,
+                rsa_hash,
+                &mut agent,
+            ),
+        )
+        .await
+        .map_err(|_| AuthError::AgentTimeout(timeout))?;
+        let auth_result = timeout_result.map_err(|e| AuthError::AgentFailed(e.to_string()))?;
+        if auth_result.success() {
+            debug!("SSH agent authentication succeeded");
+            return Ok(());
+        }
+    }
+
+    Err(AuthError::AgentFailed(
+        "No agent identity was accepted by server".to_string(),
+    ))
+}
+
 pub async fn authenticate_all<H: client::Handler>(
     session: &mut client::Handle<H>,
     user: &str,
@@ -150,8 +234,19 @@ pub async fn authenticate_all<H: client::Handler>(
     password: Option<&str>,
     identity: Option<&Path>,
     timeout: f64,
+    use_agent: bool,
 ) -> Result<Duration, AuthError> {
     let start = Instant::now();
+
+    // Try SSH agent authentication first (if enabled)
+    if use_agent
+        && authenticate_agent(session, user, timeout)
+            .await
+            .inspect_err(|e| debug!("SSH agent authentication failed: {e}"))
+            .is_ok()
+    {
+        return Ok(start.elapsed());
+    }
 
     // Try public key authentication if identity file is provided
     if let Some(identity_path) = identity

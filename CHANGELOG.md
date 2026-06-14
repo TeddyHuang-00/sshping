@@ -2,7 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.3.2] - 2026-06-14
+## [unreleased]
+
+### 🚀 Features
+
+- Add SSH agent authentication support
 
 ### 🐛 Bug Fixes
 
@@ -14,6 +18,7 @@ All notable changes to this project will be documented in this file.
 
 - Add pattern for pre-lease recipe
 - Bump version to 0.3.2
+- Cargo lock maintenance
 
 ## [0.3.1] - 2026-04-04
 

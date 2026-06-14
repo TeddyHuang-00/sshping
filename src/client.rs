@@ -55,6 +55,7 @@ impl Source {
 pub struct AuthSpec {
     pub user: String,
     pub identity: Option<PathBuf>,
+    pub use_agent: bool,
     pub user_source: Source,
     pub identity_source: Source,
 }
@@ -88,6 +89,7 @@ impl Endpoint {
             password,
             self.auth.identity.as_deref(),
             timeout,
+            self.auth.use_agent,
         )
         .await
         .map_err(|e| ClientError::Auth(e.to_string()))?;
@@ -201,6 +203,7 @@ pub fn build_connection_plan(opts: &mut Options) -> Result<ConnectionPlan> {
         auth: AuthSpec {
             user: opts.target.user.clone(),
             identity: target_identity.0,
+            use_agent: opts.agent,
             identity_source: target_identity.1,
             user_source: target_user_source,
         },
@@ -366,6 +369,7 @@ fn resolve_jump_endpoint(
         auth: AuthSpec {
             user,
             identity,
+            use_agent: true,
             user_source,
             identity_source,
         },

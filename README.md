@@ -64,10 +64,11 @@ Options:
   -o, --format <FORMAT>          Output format [default: table] [possible values: table, json]
   -i, --identity <FILE>          Use identity FILE, i.e., ssh private key file
   -p, --password <PWD>           Use password PWD for authentication (not recommended)
+  -A, --agent                    Use SSH agent for authentication (default: enabled)
   -T, --ssh-timeout <SECONDS>    Time limit for ssh connection in seconds [default: 10]
   -r, --run-tests <TEST>         Run TEST [default: both] [possible values: echo, speed, both]
   -c, --char-count <COUNT>       Number of characters to echo [default: 1000]
-  -e, --echo-cmd <CMD>           Use CMD for echo command [default: "cat"]
+  -e, --echo-cmd <CMD>           Use CMD for echo command [default: cat]
   -t, --echo-timeout <SECONDS>   Time limit for echo test in seconds
   -s, --size <SIZE>              File SIZE for speed test [default: 8.0MB]
   -u, --chunk-size <CHUNK_SIZE>  Chunk SIZE for splitting file in speed test [default: 1.0MB]
@@ -192,17 +193,20 @@ If your private key is encrypted with a passphrase, you can either:
 - Provide it via the `-p` flag: `sshping user@host -i ~/.ssh/id_rsa -p "your-passphrase"` (not recommended for security)
 - Let the tool prompt you interactively (recommended): When running in an interactive terminal, you'll be prompted to enter the passphrase securely
 
-Authentication identity precedence is resolved **per endpoint** (target and each ProxyJump hop) in this order:
+SSH agent authentication is always attempted first (when `--agent` is enabled, which is the default).
+If agent authentication is not available (no agent running) or fails, authentication proceeds in this order:
 
 1. SSH config `IdentityFile` from the matching `Host` block for that endpoint
 2. CLI `--identity` file
 3. Fallback key discovery/default auth attempts (for example default keys under `~/.ssh`)
+4. Password provided via `-p` flag
+5. Interactive password prompt (when running in an interactive terminal)
 
 This means proxy hops can use their own configured keys while the target can use a different key or fall back.
 
 ### What about password authentication?
 
-Password authentication is supported but not recommended. If no public key authentication is configured, the tool will:
+Password authentication is supported but not recommended. By default, SSH agent authentication (if an agent is running) is tried first, followed by public key methods. If none of these succeed, the tool will:
 
 - Use the password provided via `-p` flag if available
 - Prompt you interactively for a password for the specific `user@host` endpoint when running in an interactive terminal (recommended over `-p` flag)

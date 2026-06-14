@@ -107,9 +107,6 @@ pub struct Options {
     ///
     /// Typically ~/.ssh/id_<algo> where <algo> is rsa, dsa, ecdsa, etc.
     ///
-    /// TIP: If you have already added the key to ssh-agent,
-    /// you don't need to specify this
-    ///
     /// This is used per endpoint only when no Host-specific IdentityFile
     /// exists.
     #[arg(
@@ -128,6 +125,13 @@ pub struct Options {
     /// Please use public key authentication instead where possible
     #[arg(short, long, value_name = "PWD", value_hint = ValueHint::Other)]
     pub password: Option<String>,
+
+    /// Use SSH agent for authentication (default: enabled)
+    ///
+    /// Tries keys loaded in ssh-agent first, then falls back to
+    /// file-based keys and password if agent fails
+    #[arg(short = 'A', long, default_value_t = true)]
+    pub agent: bool,
 
     /// Time limit for ssh connection in seconds
     ///
