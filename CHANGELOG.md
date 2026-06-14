@@ -2,11 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
-## [unreleased]
+## [0.4.0] - 2026-06-14
 
 ### 🚀 Features
 
 - Add SSH agent authentication support
+
+### 🎨 Styling
+
+- Format code
+
+### ⚙️ Miscellaneous Tasks
+
+- Bump version to 0.4.0
+
+## [0.3.2] - 2026-06-14
 
 ### 🐛 Bug Fixes
 
