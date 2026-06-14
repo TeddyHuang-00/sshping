@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.2] - 2026-06-14
+
+### 🐛 Bug Fixes
+
+- Use checked_div instead of manual checking
+- *(deps)* Update rust crate russh to 0.61.0 (#219)
+- *(deps)* Update rust crate tabled to 0.21.0 (#225)
+
+### ⚙️ Miscellaneous Tasks
+
+- Add pattern for pre-lease recipe
+- Bump version to 0.3.2
+
 ## [0.3.1] - 2026-04-04
 
 ### 🚀 Features
@@ -12,6 +25,10 @@ All notable changes to this project will be documented in this file.
 
 - Stabilize echo test by removing PTY/shell dependency and hardening channel byte handling (#197)
 
+### 📚 Documentation
+
+- Update changelog
+
 ### 🎨 Styling
 
 - Use inclusive slice
@@ -19,6 +36,7 @@ All notable changes to this project will be documented in this file.
 ### ⚙️ Miscellaneous Tasks
 
 - Pin changelog action version to latest 1.10.3
+- Bump version to 0.3.1
 
 ## [0.3.0] - 2026-04-04
 
