@@ -126,11 +126,16 @@ pub struct Options {
     #[arg(short, long, value_name = "PWD", value_hint = ValueHint::Other)]
     pub password: Option<String>,
 
-    /// Use SSH agent for authentication (default: enabled)
+    /// Use SSH agent for authentication
     ///
-    /// Tries keys loaded in ssh-agent first, then falls back to
-    /// file-based keys and password if agent fails
-    #[arg(short = 'A', long, default_value_t = true)]
+    /// Whether to try keys loaded in ssh-agent first, before all other methods.
+    #[arg(
+        short = 'A',
+        long,
+        default_missing_value = "true",
+        num_args = 0..=1,
+        default_value_t = true
+    )]
     pub agent: bool,
 
     /// Time limit for ssh connection in seconds

@@ -64,7 +64,7 @@ Options:
   -o, --format <FORMAT>          Output format [default: table] [possible values: table, json]
   -i, --identity <FILE>          Use identity FILE, i.e., ssh private key file
   -p, --password <PWD>           Use password PWD for authentication (not recommended)
-  -A, --agent                    Use SSH agent for authentication (default: enabled)
+  -A, --agent [<AGENT>]          Use SSH agent for authentication [default: true] [possible values: true, false]
   -T, --ssh-timeout <SECONDS>    Time limit for ssh connection in seconds [default: 10]
   -r, --run-tests <TEST>         Run TEST [default: both] [possible values: echo, speed, both]
   -c, --char-count <COUNT>       Number of characters to echo [default: 1000]
