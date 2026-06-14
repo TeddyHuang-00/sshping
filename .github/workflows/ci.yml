@@ -6,8 +6,6 @@ on:
   push:
     branches:
       - "**"
-    paths-ignore:
-      - ".github/**"
     tags-ignore:
       - "**"
   workflow_dispatch:
@@ -76,3 +74,35 @@ jobs:
         run: cargo build --locked --target ${{ matrix.target }}
 
       # Unit tests are run separately in repository validation workflows.
+
+  integration-test:
+    name: sshping-${{ matrix.test.name }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [format, check]
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - name: agent-auth
+            script: test_agent_auth.sh
+          - name: file-key
+            script: test_file_key.sh
+          - name: wrong-password
+            script: test_wrong_password.sh
+          - name: echo
+            script: test_echo.sh
+          - name: speed
+            script: test_speed.sh
+          - name: default-key
+            script: test_default_key.sh
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Setup SSH server
+        run: bash .github/scripts/setup-sshd.sh
+      - name: Build sshping
+        run: cargo build --locked
+      - name: Run test
+        run: bash .github/scripts/tests/${{ matrix.test.script }}
