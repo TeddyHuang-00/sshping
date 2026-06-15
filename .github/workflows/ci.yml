@@ -50,6 +50,7 @@ jobs:
   build-test:
     name: build on ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
+    needs: [check, unit-test]
     permissions:
       contents: write
     strategy:
@@ -93,7 +94,7 @@ jobs:
     name: sshping-${{ matrix.test.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [format, check]
+    needs: [check, unit-test]
     strategy:
       fail-fast: false
       matrix:
