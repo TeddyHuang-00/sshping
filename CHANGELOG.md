@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.1] - 2026-06-15
+
+### 🐛 Bug Fixes
+
+- Allow setting --agent to false
+
+### 📚 Documentation
+
+- Update changelod
+
+### ⚙️ Miscellaneous Tasks
+
+- Add 6 end-to-end ssh test in workflow
+- Add rust cache to builds; add unit test step
+- Rewire task dependencies
+- Bump runner image version
+- Bump version to 0.4.1
+
 ## [0.4.0] - 2026-06-14
 
 ### 🚀 Features
