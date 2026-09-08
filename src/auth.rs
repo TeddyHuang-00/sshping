@@ -83,7 +83,7 @@ async fn authenticate_publickey<H: client::Handler>(
     // Try to decode the key with the provided password first
     let mut key_result = decode_secret_key(&key_content, password);
 
-    // If decoding fails and we're in an interactive terminal, prompt for passphrase
+    // If decoding fails and in an interactive terminal, prompt for passphrase
     if key_result.is_err() && password.is_none() && io::stdin().is_terminal() {
         eprint!("Enter passphrase for key '{}': ", identity.display());
         if let Ok(passphrase) = rpassword::read_password()
