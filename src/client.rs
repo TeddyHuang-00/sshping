@@ -7,7 +7,7 @@ use std::{
 
 use log::debug;
 use russh::client;
-use russh_config::parse_path;
+use russh_config::{parse, Config};
 
 use crate::{auth::authenticate_all, cli::Options};
 
@@ -168,7 +168,7 @@ pub fn build_connection_plan(opts: &mut Options) -> Result<ConnectionPlan> {
         && ssh_config.exists()
     {
         debug!("SSH Config: {:?}", ssh_config);
-        let config = parse_path(ssh_config, opts.target.host.as_str()).map_err(|e| {
+        let config = parse_ssh_config_path(ssh_config, opts.target.host.as_str()).map_err(|e| {
             ClientError::ConfigParse {
                 context: "configuration",
                 source: e.to_string(),
@@ -332,11 +332,12 @@ fn resolve_jump_endpoint(
     let host_config_identity = if let Some(ssh_config) = ssh_config
         && ssh_config.exists()
     {
-        let config =
-            parse_path(ssh_config, spec.host.as_str()).map_err(|e| ClientError::ConfigParse {
+        let config = parse_ssh_config_path(ssh_config, spec.host.as_str()).map_err(|e| {
+            ClientError::ConfigParse {
                 context: "jump host configuration",
                 source: e.to_string(),
-            })?;
+            }
+        })?;
         if !config.host().is_empty() {
             host = config.host().to_string();
         }
@@ -452,12 +453,13 @@ async fn connect_via(transport: Transport<'_>, timeout: f64) -> Result<client::H
             .await
         }
         Transport::ProxyCommand(ssh_config, endpoint) => {
-            let parsed = parse_path(ssh_config, endpoint.host.as_str()).map_err(|e| {
-                ClientError::ConfigParse {
-                    context: "SSH config for ProxyCommand",
-                    source: e.to_string(),
-                }
-            })?;
+            let parsed =
+                parse_ssh_config_path(ssh_config, endpoint.host.as_str()).map_err(|e| {
+                    ClientError::ConfigParse {
+                        context: "SSH config for ProxyCommand",
+                        source: e.to_string(),
+                    }
+                })?;
             let stream = parsed.stream().await.map_err(|e| ClientError::Connect {
                 host: endpoint.host.clone(),
                 source: format!("Failed to connect through ProxyCommand: {e}"),
@@ -494,6 +496,41 @@ async fn connect_via(transport: Transport<'_>, timeout: f64) -> Result<client::H
     }
 }
 
+fn parse_ssh_config_path(
+    path: &Path,
+    host: &str,
+) -> std::result::Result<Config, russh_config::Error> {
+    let contents = std::fs::read_to_string(path)?;
+    parse_ssh_config(&contents, host)
+}
+
+/// Temporary work-around for unsupported keywords parsing.
+/// This will ignore any `Match` directives so it may not be ideal,
+/// but may help some users if the content in `Match` doesn't affect the ssh.
+fn parse_ssh_config(
+    contents: &str,
+    host: &str,
+) -> std::result::Result<Config, russh_config::Error> {
+    // russh-config doesn't recognize Match. Turn it into a nonmatching Host
+    // section so its directives are isolated from real Host sections.
+    let contents = contents
+        .lines()
+        .map(|line| {
+            if line
+                .split_whitespace()
+                .next()
+                .is_some_and(|keyword| keyword.eq_ignore_ascii_case("match"))
+            {
+                "Host !*"
+            } else {
+                line
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    parse(&contents, host)
+}
+
 fn client_config(timeout: f64) -> Arc<client::Config> {
     Arc::new(client::Config {
         inactivity_timeout: Some(Duration::from_secs_f64(timeout)),
@@ -527,7 +564,24 @@ where
 mod tests {
     use std::path::PathBuf;
 
-    use super::{parse_proxy_jump, resolve_identity, resolve_user, Source};
+    use super::{parse_proxy_jump, parse_ssh_config, resolve_identity, resolve_user, Source};
+
+    #[test]
+    fn match_sections_do_not_break_or_mutate_host_config() {
+        let config = parse_ssh_config(
+            "Match host * exec \"gpg-connect-agent UPDATESTARTUPTTY /bye\"\n\
+             Host my-server\n\
+             User alice\n\
+             Match host *.internal\n\
+             User bob\n\
+             Host other-server\n\
+             User other",
+            "my-server",
+        )
+        .unwrap();
+
+        assert_eq!(config.host_config.user.as_deref(), Some("alice"));
+    }
 
     #[test]
     fn identity_prefers_host_config_then_cli_then_fallback() {
