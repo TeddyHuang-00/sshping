@@ -8,7 +8,7 @@ license = "MIT"
 repository = "https://github.com/TeddyHuang-00/sshping"
 
 [dependencies]
-bytesize = "2.0.0"
+bytesize = "2.7.0"
 clap = { version = "4.5.7", features = [
     "derive",
     "string",
@@ -38,7 +38,7 @@ tokio = { version = "1.42.0", features = ["full"] }
 whoami = "2.1.1"
 
 [build-dependencies]
-bytesize = "2.0.0"
+bytesize = "2.7.0"
 clap = { version = "4.5.7", features = [
     "derive",
     "string",
