@@ -500,8 +500,98 @@ fn parse_ssh_config_path(
     path: &Path,
     host: &str,
 ) -> std::result::Result<Config, russh_config::Error> {
-    let contents = std::fs::read_to_string(path)?;
+    let contents = expand_ssh_config(path, &mut Vec::new())?;
     parse_ssh_config(&contents, host)
+}
+
+fn expand_ssh_config(path: &Path, include_stack: &mut Vec<PathBuf>) -> std::io::Result<String> {
+    let canonical_path = std::fs::canonicalize(path)?;
+    if include_stack.contains(&canonical_path) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            format!("cyclic SSH config Include: {}", path.display()),
+        ));
+    }
+
+    include_stack.push(canonical_path);
+    let contents = std::fs::read_to_string(path)?;
+    let mut expanded = String::new();
+
+    for line in contents.lines() {
+        if let Some(value) = include_value(line) {
+            let base = path.parent().unwrap_or_else(|| Path::new("."));
+            for include in include_paths(value, base)? {
+                expanded.push_str(&expand_ssh_config(&include, include_stack)?);
+            }
+        } else {
+            expanded.push_str(line);
+            expanded.push('\n');
+        }
+    }
+
+    include_stack.pop();
+    Ok(expanded)
+}
+
+fn include_value(line: &str) -> Option<&str> {
+    let line = line.trim();
+    let (keyword, value) = line
+        .split_once(char::is_whitespace)
+        .or_else(|| line.split_once('='))?;
+    keyword
+        .eq_ignore_ascii_case("include")
+        .then_some(value.trim_start_matches([' ', '\t', '=']))
+}
+
+fn include_paths(value: &str, base: &Path) -> std::io::Result<Vec<PathBuf>> {
+    let mut paths = Vec::new();
+    let mut token = String::new();
+    let mut quote = false;
+    let mut escaped = false;
+
+    for character in value.chars() {
+        if escaped {
+            token.push(character);
+            escaped = false;
+        } else if character == '\\' && quote {
+            escaped = true;
+        } else if character == '"' {
+            quote = !quote;
+        } else if character == '#' && !quote {
+            break;
+        } else if character.is_whitespace() && !quote {
+            if !token.is_empty() {
+                paths.push(std::mem::take(&mut token));
+            }
+        } else {
+            token.push(character);
+        }
+    }
+    if !token.is_empty() {
+        paths.push(token);
+    }
+
+    let mut matches = Vec::new();
+    for path in paths {
+        let expanded = shellexpand::full(&path).map_err(|error| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string())
+        })?;
+        let mut pattern = PathBuf::from(expanded.as_ref());
+        if !pattern.is_absolute() {
+            pattern = base.join(pattern);
+        }
+        let pattern = pattern.to_string_lossy().into_owned();
+        let paths = glob::glob(&pattern).map_err(|error| {
+            std::io::Error::new(std::io::ErrorKind::InvalidInput, error.to_string())
+        })?;
+        let mut expanded_paths = Vec::new();
+        for path in paths {
+            expanded_paths.push(path?);
+        }
+        expanded_paths.sort();
+        matches.extend(expanded_paths);
+    }
+    Ok(matches)
 }
 
 /// Temporary work-around for unsupported keywords parsing.
@@ -562,9 +652,12 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
+    use std::{fs, path::PathBuf, time::SystemTime};
 
-    use super::{parse_proxy_jump, parse_ssh_config, resolve_identity, resolve_user, Source};
+    use super::{
+        parse_proxy_jump, parse_ssh_config, parse_ssh_config_path, resolve_identity, resolve_user,
+        Source,
+    };
 
     #[test]
     fn match_sections_do_not_break_or_mutate_host_config() {
@@ -581,6 +674,34 @@ mod tests {
         .unwrap();
 
         assert_eq!(config.host_config.user.as_deref(), Some("alice"));
+    }
+
+    #[test]
+    fn include_expands_relative_globs_in_lexical_order() {
+        let unique = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let directory =
+            std::env::temp_dir().join(format!("sshping-include-{}-{unique}", std::process::id()));
+        let fragments = directory.join("fragments");
+        fs::create_dir_all(&fragments).unwrap();
+        fs::write(
+            fragments.join("10-host.conf"),
+            "Match host * exec \"true\"\nHost sample\nUser included\n",
+        )
+        .unwrap();
+        fs::write(fragments.join("20-host.conf"), "Host sample\nUser later\n").unwrap();
+        fs::write(
+            directory.join("config"),
+            "Include fragments/*.conf\nHost sample\nUser fallback\n",
+        )
+        .unwrap();
+
+        let config = parse_ssh_config_path(&directory.join("config"), "sample").unwrap();
+        assert_eq!(config.host_config.user.as_deref(), Some("included"));
+
+        fs::remove_dir_all(directory).unwrap();
     }
 
     #[test]
