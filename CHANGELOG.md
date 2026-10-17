@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.1] - 2026-10-17
+
+### 🐛 Bug Fixes
+
+- *(ci)* Upload manpage in github release
+- *(ci)* Update manpage upload path
+
 ## [0.5.0] - 2026-10-17
 
 ### 🚀 Features
