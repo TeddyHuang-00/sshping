@@ -2,6 +2,51 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.5.0] - 2026-10-17
+
+### 🚀 Features
+
+- *(client)* Add support for recursively expanding `Include` directives
+- *(man)* Add man page generation
+
+### 🐛 Bug Fixes
+
+- *(deps)* Update rust crate russh to 0.62.0 (#239)
+- *(deps)* Update rust crate russh to 0.63.0 (#263)
+- *(deps)* Update rust crate tabled to 0.22.0 (#267)
+- *(deps)* Update rust crate russh-sftp to v3 (#268)
+- *(deps)* Update rust crate russh to 0.64.0 (#276)
+- *(client)* Skip parsing `Match` keywords in ssh config
+- *(deps)* Update rust crate bytesize to 2.7.0 (#281)
+- *(deps)* Update rust crate clap to 4.6.7 (#282)
+- *(deps)* Update rust crate clap_complete to 4.6.11 (#283)
+- *(deps)* Update rust crate humantime to 2.4.0 (#284)
+- *(deps)* Update rust crate indicatif to 0.18.6 (#285)
+- *(deps)* Update rust crate log to 0.4.34 (#286)
+- *(deps)* Update rust crate rand to 0.10.3 (#287)
+- *(deps)* Update rust crate rpassword to 7.5.4 (#289)
+- *(deps)* Update rust crate whoami to 2.1.3 (#297)
+- *(deps)* Update rust crate regex to 1.13.1 (#288)
+- *(deps)* Update rust crate russh to 0.64.1 (#290)
+- *(deps)* Update rust crate russh-sftp to 3.0.1 (#291)
+- *(deps)* Update rust crate serde to 1.0.229 (#292)
+- *(deps)* Update rust crate shellexpand to 3.1.2 (#294)
+- *(deps)* Update rust crate tokio to 1.53.3 (#296)
+- *(deps)* Update rust crate serde_json to 1.0.154 (#293)
+- *(deps)* Update rust crate simple_logger to 5.2.0 (#295)
+- *(deps)* Update rust crate size to 0.6.0 (#298)
+- *(deps)* Update lockfile
+
+### 📚 Documentation
+
+- Update to-do list
+
+### ⚙️ Miscellaneous Tasks
+
+- Fix code format
+- Set renovate range strategy to bump for it to update Cargo.toml as well
+- *(release)* Allow releasing from any branch to make it compatible with jujutsu
+
 ## [0.4.1] - 2026-06-15
 
 ### 🐛 Bug Fixes
@@ -115,7 +160,6 @@ All notable changes to this project will be documented in this file.
 
 ### ⚙️ Miscellaneous Tasks
 
-- Bump version to 0.2.3
 - Bump version to 0.2.4
 
 ## [0.2.3] - 2025-12-18
@@ -145,6 +189,7 @@ All notable changes to this project will be documented in this file.
 - Migrate from ssh2 to russh (#136)
 - Clean up empty feature
 - Update macos runner images
+- Bump version to 0.2.3
 
 ## [0.2.2] - 2025-08-27
 
