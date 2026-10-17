@@ -29,7 +29,7 @@ russh = "0.64.1"
 russh-config = "0.58.0"
 russh-sftp = "3.0.1"
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.138"
+serde_json = "1.0.154"
 shellexpand = "3.1.2"
 simple_logger = "5.0.0"
 size = "0.5.0"
@@ -50,7 +50,7 @@ clap_complete = { version = "4.6.11", features = ["unstable-dynamic"] }
 clap_mangen = "0.3.3"
 regex = "1.13.1"
 serde = { version = "1.0.229", features = ["derive"] }
-serde_json = "1.0.138"
+serde_json = "1.0.154"
 shellexpand = "3.1.2"
 tabled = "0.22.0"
 whoami = "2.1.3"
