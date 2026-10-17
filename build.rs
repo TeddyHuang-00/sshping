@@ -21,18 +21,21 @@ fn main() -> Result<(), Error> {
     let mut cmd = Options::command();
 
     // New directory for completions in target/<profile>/completions
-    let completion_path = profile_root.join("completions").into_os_string();
-    // Make sure the completion directory exists
+    let completion_path = profile_root.join("completions");
     std::fs::create_dir_all(&completion_path)?;
+
     for &shell in Shell::value_variants() {
         generate_to(shell, &mut cmd, "sshping", &completion_path)?;
     }
 
-    // Manpage generation in target/<profile>/
+    // Manpage generation in target/<profile>/man
+    let manpage_path = profile_root.join("man");
+    std::fs::create_dir_all(&manpage_path)?;
+
     let man = Man::new(cmd);
     let mut buffer = vec![];
     man.render(&mut buffer)?;
-    std::fs::write(profile_root.join("sshping.1"), buffer)?;
+    std::fs::write(manpage_path.join("sshping.1"), buffer)?;
 
     Ok(())
 }
