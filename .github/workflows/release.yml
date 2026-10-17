@@ -87,7 +87,7 @@ jobs:
         if: ${{ matrix.target == 'x86_64-unknown-linux-musl' }}
         uses: ncipollo/release-action@v1.21.0
         with:
-          artifacts: "target/${{ matrix.target }}/release/*.1"
+          artifacts: "target/${{ matrix.target }}/release/man/*"
           allowUpdates: true
           omitNameDuringUpdate: true
           omitBodyDuringUpdate: true
