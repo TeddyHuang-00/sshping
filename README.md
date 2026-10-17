@@ -171,7 +171,7 @@ Currently, there are a few things that can be added but haven't been yet. If you
 
 - [x] Table style customization
 - [x] Unit tests
-- [ ] Man page generation
+- [x] Man page generation
 - [x] Shell autocompletion script generation
 - [ ] Packaging for various platforms
 - [ ] More SSH tests
