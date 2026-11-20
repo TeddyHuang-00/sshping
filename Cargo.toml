@@ -9,7 +9,7 @@ repository = "https://github.com/TeddyHuang-00/sshping"
 
 [dependencies]
 bytesize = "2.7.0"
-clap = { version = "4.6.8", features = [
+clap = { version = "4.6.9", features = [
     "derive",
     "string",
     "cargo",
@@ -39,7 +39,7 @@ whoami = "2.1.3"
 
 [build-dependencies]
 bytesize = "2.7.0"
-clap = { version = "4.6.8", features = [
+clap = { version = "4.6.9", features = [
     "derive",
     "string",
     "cargo",
