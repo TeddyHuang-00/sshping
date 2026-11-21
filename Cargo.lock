@@ -1821,9 +1821,9 @@ dependencies = [
 
 [[package]]
 name = "russh-config"
-version = "0.58.0"
+version = "0.65.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "993346101d4741a59c82bafc6b645c52ce3e7b0820f13e4b5d48cdb591e3d955"
+checksum = "2482e18c04c939c36e1b550d469c3465164af0acad96b7b4d4735d0197d3a529"
 dependencies = [
  "futures",
  "globset",
